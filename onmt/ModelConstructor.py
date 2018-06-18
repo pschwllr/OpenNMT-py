@@ -17,6 +17,8 @@ from onmt.modules import Embeddings, ImageEncoder, CopyGenerator, \
 from onmt.Utils import use_gpu
 from torch.nn.init import xavier_uniform
 
+from pdb import set_trace
+
 
 def make_embeddings(opt, word_dict, feature_dicts, for_encoder=True):
     """

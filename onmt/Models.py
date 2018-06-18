@@ -7,6 +7,8 @@ from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
+from pdb import set_trace
+
 import onmt
 from onmt.Utils import aeq
 
@@ -617,11 +619,20 @@ class DecoderState(object):
             if len(sizes) == 3:
                 sent_states = e.view(sizes[0], beam_size, br // beam_size,
                                      sizes[2])[:, :, idx]
-            else:
+            elif len(sizes) == 4:
                 sent_states = e.view(sizes[0], beam_size,
                                      br // beam_size,
                                      sizes[2],
                                      sizes[3])[:, :, idx]
+            elif len(sizes) == 5:
+            	sent_states = e.view(sizes[0], beam_size,
+                                     br // beam_size,
+                                     sizes[2],
+                                     sizes[3],
+                                     sizes[4])[:, :, idx]
+            else:
+            	raise NotImplementedError()
+
 
             sent_states.data.copy_(
                 sent_states.data.index_select(1, positions))

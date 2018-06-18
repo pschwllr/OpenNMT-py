@@ -5,6 +5,8 @@ from torch.autograd import Variable
 
 from onmt.Utils import aeq
 
+from pdb import set_trace
+
 
 class MultiHeadedAttention(nn.Module):
     """
@@ -47,7 +49,7 @@ class MultiHeadedAttention(nn.Module):
            must be divisible by head_count
        dropout (float): dropout parameter
     """
-    def __init__(self, head_count, model_dim, dropout=0.1):
+    def __init__(self, head_count, model_dim, dropout=0.1, keep_attn=False):
         assert model_dim % head_count == 0
         self.dim_per_head = model_dim // head_count
         self.model_dim = model_dim
@@ -64,6 +66,10 @@ class MultiHeadedAttention(nn.Module):
         self.sm = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
         self.final_linear = nn.Linear(model_dim, model_dim)
+
+        self.keep_attn = keep_attn
+
+        self.attn = None
 
     def forward(self, key, value, query, mask=None):
         """
@@ -141,10 +147,15 @@ class MultiHeadedAttention(nn.Module):
         aeq(batch, batch_)
         aeq(d, d_)
 
+
+
         # Return one attn
         top_attn = attn \
             .view(batch_size, head_count,
                   query_len, key_len)[:, 0, :, :] \
             .contiguous()
+        if self.keep_attn:
+            self.attn = attn.view(batch_size, head_count,
+                  query_len, key_len)
         # END CHECK
         return output, top_attn

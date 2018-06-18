@@ -12,6 +12,8 @@ from onmt.Models import EncoderBase
 from onmt.Models import DecoderState
 from onmt.Utils import aeq
 
+from pdb import set_trace
+
 MAX_SIZE = 5000
 
 
@@ -134,6 +136,8 @@ class TransformerEncoder(EncoderBase):
             out = self.transformer[i](out, mask)
         out = self.layer_norm(out)
 
+
+
         return Variable(emb.data), out.transpose(0, 1).contiguous()
 
 
@@ -153,7 +157,7 @@ class TransformerDecoderLayer(nn.Module):
         self.self_attn = onmt.modules.MultiHeadedAttention(
                 head_count, size, dropout=dropout)
         self.context_attn = onmt.modules.MultiHeadedAttention(
-                head_count, size, dropout=dropout)
+                head_count, size, dropout=dropout, keep_attn=True)
         self.feed_forward = PositionwiseFeedForward(size,
                                                     hidden_size,
                                                     dropout)
@@ -316,6 +320,7 @@ class TransformerDecoder(nn.Module):
             .expand(tgt_batch, tgt_len, tgt_len)
 
         saved_inputs = []
+        saved_attns = []
         for i in range(self.num_layers):
             prev_layer_input = None
             if state.previous_input is not None:
@@ -324,21 +329,35 @@ class TransformerDecoder(nn.Module):
                 = self.transformer_layers[i](output, src_memory_bank,
                                              src_pad_mask, tgt_pad_mask,
                                              previous_input=prev_layer_input)
+            if self.transformer_layers[i].context_attn.keep_attn:
+                saved_attns.append(self.transformer_layers[i].context_attn.attn[:, :, :, :])
             saved_inputs.append(all_input)
 
+
         saved_inputs = torch.stack(saved_inputs)
+
+
+        if len(saved_attns) != 0:
+            saved_attns = torch.stack(saved_attns)
+        if state.context_attn is not None:
+            saved_attns = torch.cat((state.context_attn, saved_attns), dim=3)
+
         output = self.layer_norm(output)
 
         # Process the result and update the attentions.
         outputs = output.transpose(0, 1).contiguous()
         attn = attn.transpose(0, 1).contiguous()
 
+
         attns["std"] = attn
         if self._copy:
             attns["copy"] = attn
 
         # Update the state.
-        state = state.update_state(tgt, saved_inputs)
+        if len(saved_attns) == 0:
+            state = state.update_state(tgt, saved_inputs)
+        else:
+            state = state.update_state(tgt, saved_inputs, saved_attns)
         return outputs, state, attns
 
     def init_decoder_state(self, src, memory_bank, enc_hidden):
@@ -355,19 +374,22 @@ class TransformerDecoderState(DecoderState):
         self.src = src
         self.previous_input = None
         self.previous_layer_inputs = None
+        self.context_attn = None
 
     @property
     def _all(self):
         """
         Contains attributes that need to be updated in self.beam_update().
         """
-        return (self.previous_input, self.previous_layer_inputs, self.src)
+        return (self.previous_input, self.previous_layer_inputs, self.src, self.context_attn)
 
-    def update_state(self, input, previous_layer_inputs):
+    def update_state(self, input, previous_layer_inputs, context_attn=None):
         """ Called for every decoder forward pass. """
         state = TransformerDecoderState(self.src)
         state.previous_input = input
         state.previous_layer_inputs = previous_layer_inputs
+        if context_attn is not None:
+            state.context_attn = context_attn
         return state
 
     def repeat_beam_size_times(self, beam_size):
