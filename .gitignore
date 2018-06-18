@@ -9,7 +9,7 @@ multi-bleu.perl
 data/
 
 # Byte-compiled / optimized / DLL files
-__pycache__/
+*__pycache__/
 *.py[cod]
 *$py.class
 
@@ -110,3 +110,6 @@ ENV/
 
 # Tensorboard
 runs/
+
+experiments/
+available_models/
