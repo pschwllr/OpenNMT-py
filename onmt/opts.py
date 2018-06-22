@@ -89,9 +89,6 @@ def model_opts(parser):
 
     group.add_argument('-brnn', action=DeprecateAction,
                        help="Deprecated, use `encoder_type`.")
-    group.add_argument('-brnn_merge', default='concat',
-                       choices=['concat', 'sum'],
-                       help="Merge action for the bidir hidden states")
 
     group.add_argument('-context_gate', type=str, default=None,
                        choices=['source', 'target', 'both'],
@@ -118,6 +115,8 @@ def model_opts(parser):
                        help='Train a coverage attention layer.')
     group.add_argument('-lambda_coverage', type=float, default=1,
                        help='Lambda value for coverage.')
+    group.add_argument('-keep_attn', action="store_true", default=False,
+                       help='Keep all decoder context attention' )
 
 
 def preprocess_opts(parser):
@@ -195,6 +194,8 @@ def preprocess_opts(parser):
     group = parser.add_argument_group('Logging')
     group.add_argument('-report_every', type=int, default=100000,
                        help="Report status every this many sentences")
+    group.add_argument('-log_file', type=str, default="",
+                       help="Output logs to a file under this path.")
 
     # Options most relevant to speech
     group = parser.add_argument_group('Speech')
@@ -352,6 +353,8 @@ def train_opts(parser):
     group = parser.add_argument_group('Logging')
     group.add_argument('-report_every', type=int, default=50,
                        help="Print stats at this interval.")
+    group.add_argument('-log_file', type=str, default="",
+                       help="Output logs to a file under this path.")
     group.add_argument('-exp_host', type=str, default="",
                        help="Send logs to this crayon server.")
     group.add_argument('-exp', type=str, default="",
@@ -450,6 +453,8 @@ def translate_opts(parser):
     group = parser.add_argument_group('Logging')
     group.add_argument('-verbose', action="store_true",
                        help='Print scores and predictions for each sentence')
+    group.add_argument('-log_file', type=str, default="",
+                       help="Output logs to a file under this path.")
     group.add_argument('-attn_debug', action="store_true",
                        help='Print best attn for each word')
     group.add_argument('-dump_beam', type=str, default="",

@@ -10,10 +10,10 @@ import onmt.io
 import onmt.Models
 import onmt.modules
 from onmt.Models import NMTModel, MeanEncoder, RNNEncoder, \
-                        StdRNNDecoder, InputFeedRNNDecoder
+    StdRNNDecoder, InputFeedRNNDecoder
 from onmt.modules import Embeddings, ImageEncoder, CopyGenerator, \
-                         TransformerEncoder, TransformerDecoder, \
-                         CNNEncoder, CNNDecoder, AudioEncoder
+    TransformerEncoder, TransformerDecoder, \
+    CNNEncoder, CNNDecoder, AudioEncoder
 from onmt.Utils import use_gpu
 from torch.nn.init import xavier_uniform
 
@@ -86,6 +86,12 @@ def make_decoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     if opt.decoder_type == "transformer":
+        if hasattr(opt, 'keep_attn'):
+            print('Keep attn set to: ', opt.keep_attn)
+            return TransformerDecoder(opt.dec_layers, opt.rnn_size,
+                                  opt.global_attention, opt.copy_attn,
+                                  opt.dropout, embeddings, keep_attn=opt.keep_attn)
+
         return TransformerDecoder(opt.dec_layers, opt.rnn_size,
                                   opt.global_attention, opt.copy_attn,
                                   opt.dropout, embeddings)
@@ -121,11 +127,13 @@ def load_test_model(opt, dummy_opt):
                             map_location=lambda storage, loc: storage)
     fields = onmt.io.load_fields_from_vocab(
         checkpoint['vocab'], data_type=opt.data_type)
-
     model_opt = checkpoint['opt']
     for arg in dummy_opt:
         if arg not in model_opt:
             model_opt.__dict__[arg] = dummy_opt[arg]
+
+    # added possibility to keep context attn in decoder
+    model_opt.__dict__['keep_attn'] = opt.__dict__['keep_attn']
 
     model = make_base_model(model_opt, fields,
                             use_gpu(opt), checkpoint)
@@ -182,7 +190,6 @@ def make_base_model(model_opt, fields, gpu, checkpoint=None):
                                  'preprocess if you use share_embeddings!')
 
         tgt_embeddings.word_lut.weight = src_embeddings.word_lut.weight
-
     decoder = make_decoder(model_opt, tgt_embeddings)
 
     # Make NMTModel(= encoder + decoder).
@@ -202,12 +209,10 @@ def make_base_model(model_opt, fields, gpu, checkpoint=None):
 
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
-        print('Loading model parameters.')
         model.load_state_dict(checkpoint['model'])
         generator.load_state_dict(checkpoint['generator'])
     else:
         if model_opt.param_init != 0.0:
-            print('Intializing model parameters.')
             for p in model.parameters():
                 p.data.uniform_(-model_opt.param_init, model_opt.param_init)
             for p in generator.parameters():
@@ -222,10 +227,10 @@ def make_base_model(model_opt, fields, gpu, checkpoint=None):
 
         if hasattr(model.encoder, 'embeddings'):
             model.encoder.embeddings.load_pretrained_vectors(
-                    model_opt.pre_word_vecs_enc, model_opt.fix_word_vecs_enc)
+                model_opt.pre_word_vecs_enc, model_opt.fix_word_vecs_enc)
         if hasattr(model.decoder, 'embeddings'):
             model.decoder.embeddings.load_pretrained_vectors(
-                    model_opt.pre_word_vecs_dec, model_opt.fix_word_vecs_dec)
+                model_opt.pre_word_vecs_dec, model_opt.fix_word_vecs_dec)
 
     # Add generator to model (this registers it as parameter of model).
     model.generator = generator

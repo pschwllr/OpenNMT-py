@@ -4,7 +4,6 @@ import codecs
 import os
 import math
 
-from torch.autograd import Variable
 from itertools import count
 
 import onmt.ModelConstructor
@@ -15,7 +14,7 @@ import onmt.opts
 from pdb import set_trace  
 
 
-def make_translator(opt, report_score=True, out_file=None):
+def make_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         out_file = codecs.open(opt.output, 'w', 'utf-8')
 
@@ -37,12 +36,13 @@ def make_translator(opt, report_score=True, out_file=None):
     kwargs = {k: getattr(opt, k)
               for k in ["beam_size", "n_best", "max_length", "min_length",
                         "stepwise_penalty", "block_ngram_repeat",
-                        "ignore_when_blocking", "dump_beam",
+                        "ignore_when_blocking", "dump_beam", 
                         "data_type", "replace_unk", "gpu", "verbose"]}
 
     translator = Translator(model, fields, global_scorer=scorer,
                             out_file=out_file, report_score=report_score,
-                            copy_attn=model_opt.copy_attn, **kwargs)
+                            copy_attn=model_opt.copy_attn, logger=logger,
+                            **kwargs)
     return translator
 
 
@@ -63,6 +63,7 @@ class Translator(object):
        copy_attn (bool): use copy attention during translation
        cuda (bool): use cuda
        beam_trace (bool): trace beam search for debugging
+       logger(logging.Logger): logger.
     """
 
     def __init__(self,
@@ -73,6 +74,7 @@ class Translator(object):
                  max_length=100,
                  global_scorer=None,
                  copy_attn=False,
+                 logger=None,
                  gpu=False,
                  dump_beam="",
                  min_length=0,
@@ -91,6 +93,7 @@ class Translator(object):
                  report_rouge=False,
                  verbose=False,
                  out_file=None):
+        self.logger = logger
         self.gpu = gpu
         self.cuda = gpu > -1
 
@@ -178,8 +181,13 @@ class Translator(object):
                 if self.verbose:
                     sent_number = next(counter)
                     output = trans.log(sent_number)
-                    os.write(1, output.encode('utf-8'))
-                    print(output.encode('utf-8'))
+
+                    if self.logger:
+                        self.logger.info(output)
+                    else:
+                        os.write(1, output.encode('utf-8'))
+
+
                 # Debug attention.
                 if attn_debug:
                     srcs = trans.src_raw
@@ -201,13 +209,31 @@ class Translator(object):
                     print(output.encode('utf-8'))
 
         if self.report_score:
-            self._report_score('PRED', pred_score_total, pred_words_total)
+            msg = self._report_score('PRED', pred_score_total,
+                                     pred_words_total)
+            if self.logger:
+                self.logger.info(msg)
+            else:
+                print(msg)
             if tgt_path is not None:
-                self._report_score('GOLD', gold_score_total, gold_words_total)
+                msg = self._report_score('GOLD', gold_score_total,
+                                         gold_words_total)
+                if self.logger:
+                    self.logger.info(msg)
+                else:
+                    print(msg)
                 if self.report_bleu:
-                    self._report_bleu(tgt_path)
+                    msg = self._report_bleu(tgt_path)
+                    if self.logger:
+                        self.logger.info(msg)
+                    else:
+                        print(msg)
                 if self.report_rouge:
-                    self._report_rouge(tgt_path)
+                    msg = self._report_rouge(tgt_path)
+                    if self.logger:
+                        self.logger.info(msg)
+                    else:
+                        print(msg)
 
         if self.dump_beam:
             import json
@@ -231,12 +257,6 @@ class Translator(object):
         Todo:
            Shouldn't need the original dataset.
         """
-        # if src.size()[1] != 1:
-        #     raise ValueError('Only works with batch_size 1')
-
-        if self.copy_attn:
-            raise ValueError('Not implemented')
-
         # (0) Prep each of the components of the search.
         # And helper method for reducing verbosity.
         beam_size = self.beam_size
@@ -245,16 +265,17 @@ class Translator(object):
         vocab = self.fields["tgt"].vocab
         src_vocab = self.fields["src"].vocab
 
-        src = Variable(torch.LongTensor([src_vocab.stoi[token] for token in src_tokens]))
+        src = torch.LongTensor([src_vocab.stoi[token] for token in src_tokens])
 
         src = src.unsqueeze(1).unsqueeze(2)
 
+        src_lengths = torch.LongTensor([src.size()[0]])
+
+
         # Define a list of tokens to exclude from ngram-blocking
         # exclusion_list = ["<t>", "</t>", "."]
-        # exclusion_tokens = set([vocab.stoi[t]
-        #                         for t in self.ignore_when_blocking])
-
-        exclusion_tokens = set([]) # no need atm
+        exclusion_tokens = set([vocab.stoi[t]
+                                for t in self.ignore_when_blocking])
 
         beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
                                     cuda=self.cuda,
@@ -269,7 +290,7 @@ class Translator(object):
                 for __ in range(batch_size)]
 
         # Help functions for working with beams and batches
-        def var(a): return Variable(a, volatile=True)
+        def var(a): return a
 
         def rvar(a): return var(a.repeat(1, beam_size, 1))
 
@@ -280,14 +301,6 @@ class Translator(object):
             return m.view(beam_size, batch_size, -1)
 
         # (1) Run the encoder on the src.
-        # src = onmt.io.make_features(batch, 'src', data_type)
-        # src_lengths = None
-        # if data_type == 'text':
-        #     _, src_lengths = batch.src
-
-        src_lengths = torch.LongTensor([src.size()[0]])
-
-        
 
         enc_states, memory_bank = self.model.encoder(src, src_lengths)
         dec_states = self.model.decoder.init_decoder_state(
@@ -305,7 +318,6 @@ class Translator(object):
         memory_lengths = src_lengths.repeat(beam_size)
         dec_states.repeat_beam_size_times(beam_size)
 
-
         # (3) run the decoder to generate sentences, using beam search.
         for i in range(self.max_length):
             if all((b.done() for b in beam)):
@@ -316,6 +328,11 @@ class Translator(object):
             inp = var(torch.stack([b.get_current_state() for b in beam])
                       .t().contiguous().view(1, -1))
 
+            # Turn any copied words to UNKs
+            # 0 is unk
+            if self.copy_attn:
+                inp = inp.masked_fill(
+                    inp.gt(len(self.fields["tgt"].vocab) - 1), 0)
 
             # Temporary kludge solution to handle changed dim expectation
             # in the decoder
@@ -328,18 +345,28 @@ class Translator(object):
             # dec_out: beam x rnn_size
 
             # (b) Compute a vector of batch x beam word scores.
-            
-            out = self.model.generator.forward(dec_out).data
-            out = unbottle(out)
-            # beam x tgt_vocab
-            beam_attn = unbottle(attn["std"])
-
-          
+            if not self.copy_attn:
+                out = self.model.generator.forward(dec_out).data
+                out = unbottle(out)
+                # beam x tgt_vocab
+                beam_attn = unbottle(attn["std"])
+            else:
+                out = self.model.generator.forward(dec_out,
+                                                   attn["copy"].squeeze(0),
+                                                   src_map)
+                # beam x (tgt_vocab + extra_vocab)
+                out = data.collapse_copy_scores(
+                    unbottle(out.data),
+                    batch, self.fields["tgt"].vocab, data.src_vocabs)
+                # beam x tgt_vocab
+                out = out.log()
+                beam_attn = unbottle(attn["copy"])
             # (c) Advance each beam.
             for j, b in enumerate(beam):
                 b.advance(out[:, j],
                           beam_attn.data[:, j, :memory_lengths[j]])
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
+
 
         # (4) Extract sentences from beam.
         ret = self._from_beam(beam)
@@ -412,7 +439,7 @@ class Translator(object):
                 for __ in range(batch_size)]
 
         # Help functions for working with beams and batches
-        def var(a): return Variable(a, volatile=True)
+        def var(a): return a
 
         def rvar(a): return var(a.repeat(1, beam_size, 1))
 
@@ -546,61 +573,34 @@ class Translator(object):
             tgt = tgt.unsqueeze(1)
             scores = out.data.gather(1, tgt)
             scores.masked_fill_(tgt.eq(tgt_pad), 0)
-            gold_scores += scores
+            gold_scores += scores.view(-1)
         return gold_scores
 
 
     def _run_target_single(self, src, tgt_tokens):
-        # data_type = data.data_type
-        # if data_type == 'text':
-        #     _, src_lengths = batch.src
-        # else:
-        #     src_lengths = None
-        # src = onmt.io.make_features(batch, 'src', data_type)
-        # tgt_in = onmt.io.make_features(batch, 'tgt')[:-1]
+
 
         raise ValueError('Not yet implemented')
 
-        src_lengths = src.size()[0]
 
-        #  (1) run the encoder on the src
-        enc_states, memory_bank = self.model.encoder(src, src_lengths)
-        dec_states = \
-            self.model.decoder.init_decoder_state(src, memory_bank, enc_states)
-
-        #  (2) if a target is specified, compute the 'goldScore'
-        #  (i.e. log likelihood) of the target under the model
-        tt = torch.cuda if self.cuda else torch
-        gold_scores = tt.FloatTensor(batch.batch_size).fill_(0)
-        dec_out, _, _ = self.model.decoder(
-            tgt_in, memory_bank, dec_states, memory_lengths=src_lengths)
-
-        tgt_pad = self.fields["tgt"].vocab.stoi[onmt.io.PAD_WORD]
-        for dec, tgt in zip(dec_out, batch.tgt[1:].data):
-            # Log prob of each word.
-            out = self.model.generator.forward(dec)
-            tgt = tgt.unsqueeze(1)
-            scores = out.data.gather(1, tgt)
-            scores.masked_fill_(tgt.eq(tgt_pad), 0)
-            gold_scores += scores
-        return gold_scores
 
     def _report_score(self, name, score_total, words_total):
-        print("%s AVG SCORE: %.4f, %s PPL: %.4f" % (
+        msg = ("%s AVG SCORE: %.4f, %s PPL: %.4f" % (
             name, score_total / words_total,
             name, math.exp(-score_total / words_total)))
+        return msg
 
     def _report_bleu(self, tgt_path):
         import subprocess
         path = os.path.split(os.path.realpath(__file__))[0]
-        print()
 
         res = subprocess.check_output("perl %s/tools/multi-bleu.perl %s"
                                       % (path, tgt_path, self.output),
                                       stdin=self.out_file,
                                       shell=True).decode("utf-8")
 
-        print(">> " + res.strip())
+        msg = ">> " + res.strip()
+        return msg
 
     def _report_rouge(self, tgt_path):
         import subprocess
@@ -610,4 +610,5 @@ class Translator(object):
             % (path, tgt_path),
             shell=True,
             stdin=self.out_file).decode("utf-8")
-        print(res.strip())
+        msg = res.strip()
+        return msg

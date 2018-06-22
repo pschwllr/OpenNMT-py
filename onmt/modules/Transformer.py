@@ -4,7 +4,6 @@ Implementation of "Attention is All You Need"
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import numpy as np
 
 import onmt
@@ -26,13 +25,14 @@ class PositionwiseFeedForward(nn.Module):
                               of the FNN.
             dropout (float): dropout probability(0-1.0).
     """
+
     def __init__(self, size, hidden_size, dropout=0.1):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(size, hidden_size)
         self.w_2 = nn.Linear(hidden_size, size)
         self.layer_norm = onmt.modules.LayerNorm(size)
+        self.dropout_1 = nn.Dropout(dropout)
         # Save a little memory, by doing inplace.
-        self.dropout_1 = nn.Dropout(dropout, inplace=True)
         self.relu = nn.ReLU(inplace=True)
         self.dropout_2 = nn.Dropout(dropout)
 
@@ -100,6 +100,7 @@ class TransformerEncoder(EncoderBase):
        embeddings (:obj:`onmt.modules.Embeddings`):
           embeddings to use, should have positional encodings
     """
+
     def __init__(self, num_layers, hidden_size,
                  dropout, embeddings):
         super(TransformerEncoder, self).__init__()
@@ -137,8 +138,7 @@ class TransformerEncoder(EncoderBase):
         out = self.layer_norm(out)
 
 
-
-        return Variable(emb.data), out.transpose(0, 1).contiguous()
+        return emb, out.transpose(0, 1).contiguous()
 
 
 class TransformerDecoderLayer(nn.Module):
@@ -151,13 +151,15 @@ class TransformerDecoderLayer(nn.Module):
       head_count(int): the number of heads for MultiHeadedAttention.
       hidden_size(int): the second-layer of the PositionwiseFeedForward.
     """
+
     def __init__(self, size, dropout,
-                 head_count=8, hidden_size=2048):
+                 head_count=8, hidden_size=2048, keep_attn=False):
         super(TransformerDecoderLayer, self).__init__()
         self.self_attn = onmt.modules.MultiHeadedAttention(
-                head_count, size, dropout=dropout)
+            head_count, size, dropout=dropout)
         self.context_attn = onmt.modules.MultiHeadedAttention(
-                head_count, size, dropout=dropout, keep_attn=True)
+                head_count, size, dropout=dropout, keep_attn=keep_attn)
+
         self.feed_forward = PositionwiseFeedForward(size,
                                                     hidden_size,
                                                     dropout)
@@ -253,8 +255,9 @@ class TransformerDecoder(nn.Module):
 
        attn_type (str): if using a seperate copy attention
     """
+
     def __init__(self, num_layers, hidden_size, attn_type,
-                 copy_attn, dropout, embeddings):
+                 copy_attn, dropout, embeddings, keep_attn=False):
         super(TransformerDecoder, self).__init__()
 
         # Basic attributes.
@@ -264,7 +267,7 @@ class TransformerDecoder(nn.Module):
 
         # Build TransformerDecoder.
         self.transformer_layers = nn.ModuleList(
-            [TransformerDecoderLayer(hidden_size, dropout)
+            [TransformerDecoderLayer(hidden_size, dropout, keep_attn=keep_attn)
              for _ in range(num_layers)])
 
         # TransformerDecoder has its own attention mechanism.
@@ -381,7 +384,10 @@ class TransformerDecoderState(DecoderState):
         """
         Contains attributes that need to be updated in self.beam_update().
         """
-        return (self.previous_input, self.previous_layer_inputs, self.src, self.context_attn)
+        if self.context_attn is not None:
+            return (self.previous_input, self.previous_layer_inputs, self.src, self.context_attn)
+        else:
+            return (self.previous_input, self.previous_layer_inputs, self.src)
 
     def update_state(self, input, previous_layer_inputs, context_attn=None):
         """ Called for every decoder forward pass. """
@@ -394,5 +400,4 @@ class TransformerDecoderState(DecoderState):
 
     def repeat_beam_size_times(self, beam_size):
         """ Repeat beam_size times along batch dimension. """
-        self.src = Variable(self.src.data.repeat(1, beam_size, 1),
-                            volatile=True)
+        self.src = self.src.data.repeat(1, beam_size, 1)
