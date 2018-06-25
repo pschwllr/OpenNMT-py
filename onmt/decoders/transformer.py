@@ -269,16 +269,12 @@ class TransformerDecoderState(DecoderState):
         else:
             return (self.previous_input, self.previous_layer_inputs, self.src)
 
-<<<<<<< HEAD:onmt/modules/Transformer.py
-    def update_state(self, input, previous_layer_inputs, context_attn=None):
-=======
     def detach(self):
         self.previous_input = self.previous_input.detach()
         self.previous_layer_inputs = self.previous_layer_inputs.detach()
         self.src = self.src.detach()
 
-    def update_state(self, new_input, previous_layer_inputs):
->>>>>>> upstream/master:onmt/decoders/transformer.py
+    def update_state(self, new_input, previous_layer_inputs, context_attn=None):
         """ Called for every decoder forward pass. """
         state = TransformerDecoderState(self.src)
         state.previous_input = new_input
