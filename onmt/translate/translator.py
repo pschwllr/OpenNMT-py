@@ -297,9 +297,9 @@ class Translator(object):
         beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
                                     cuda=self.cuda,
                                     global_scorer=self.global_scorer,
-                                    pad=vocab.stoi[onmt.io.PAD_WORD],
-                                    eos=vocab.stoi[onmt.io.EOS_WORD],
-                                    bos=vocab.stoi[onmt.io.BOS_WORD],
+                                    pad=vocab.stoi[inputters.PAD_WORD],
+                                    eos=vocab.stoi[inputters.EOS_WORD],
+                                    bos=vocab.stoi[inputters.BOS_WORD],
                                     min_length=self.min_length,
                                     stepwise_penalty=self.stepwise_penalty,
                                     block_ngram_repeat=self.block_ngram_repeat,
@@ -400,7 +400,7 @@ class Translator(object):
                     tokens.append(vocab.itos[tok])
                 else:
                     tokens.append(src_vocab.itos[tok - len(vocab)])
-                if tokens[-1] == onmt.io.EOS_WORD:
+                if tokens[-1] == inputters.EOS_WORD:
                     tokens = tokens[:-1]
                     break
             predicted_tokens.append(tokens)
