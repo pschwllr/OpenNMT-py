@@ -9,6 +9,12 @@ from onmt.utils import loss
 
 from pdb import set_trace
 
+from rdkit import RDLogger
+
+lg = RDLogger.logger()
+
+lg.setLevel(RDLogger.CRITICAL)
+
 
 class CanonicalAccuracy(object):
     def __init__(self, tgt_vocab):
@@ -152,7 +158,7 @@ class MixedLossCompute(loss.LossComputeBase):
                                      ml_pred.view(target.size()).t(), 
                                      target.t()
                                  )
-            
+
             metric = metric.to(self.device)
 
             rl_loss = (rl_loss * metric).sum()
