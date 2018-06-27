@@ -5,7 +5,6 @@ import torch
 import torch.cuda
 
 import onmt.inputters as inputters
-from onmt.utils.misc import use_gpu
 from onmt.utils import loss
 
 from pdb import set_trace
@@ -105,7 +104,7 @@ class MixedLossCompute(loss.LossComputeBase):
         self.confidence = 1.0 - label_smoothing
         self.gamma = gamma
         self.scoring_function = CanonicalAccuracy(tgt_vocab)
-        self.device = torch.device("cuda" if use_gpu(opt) else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
     def _make_shard_state(self, batch, output, range_, attns=None):
@@ -153,6 +152,8 @@ class MixedLossCompute(loss.LossComputeBase):
                                      ml_pred.view(target.size()).t(), 
                                      target.t()
                                  )
+            
+            metric = metric.to(self.device)
 
             rl_loss = (rl_loss * metric).sum()
             loss = (self.gamma * rl_loss) + ((1 - self.gamma) * ml_loss)
