@@ -17,6 +17,8 @@ import torch.nn as nn
 import onmt.inputters as inputters
 import onmt.utils
 
+from pdb import set_trace
+
 
 def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
     """
@@ -40,12 +42,13 @@ def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
     shard_size = opt.max_generator_batches
     norm_method = opt.normalization
     grad_accum_count = opt.accum_count
+    rl_gamma = opt.rl_gamma
 
     report_manager = onmt.utils.build_report_manager(opt)
     trainer = onmt.Trainer(model, train_loss, valid_loss, optim,
                            trunc_size, shard_size, data_type,
                            norm_method, grad_accum_count, report_manager,
-                           model_saver=model_saver)
+                           model_saver=model_saver, rl_gamma=rl_gamma)
     return trainer
 
 
@@ -77,7 +80,7 @@ class Trainer(object):
     def __init__(self, model, train_loss, valid_loss, optim,
                  trunc_size=0, shard_size=32, data_type='text',
                  norm_method="sents", grad_accum_count=1, report_manager=None,
-                 model_saver=None):
+                 model_saver=None, rl_gamma=0.0):
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
@@ -90,12 +93,18 @@ class Trainer(object):
         self.grad_accum_count = grad_accum_count
         self.report_manager = report_manager
         self.model_saver = model_saver
+        self.rl_gamma = rl_gamma
 
         assert grad_accum_count > 0
         if grad_accum_count > 1:
             assert(self.trunc_size == 0), \
                 """To enable accumulated gradients,
                    you must disable target sequence truncating."""
+
+        if rl_gamma > 0.0:
+            print("rl_gamma {}: Make sure shard_size {} is larger than max length of target".format(
+                    rl_gamma, shard_size
+                ))
 
         # Set model in training mode.
         self.model.train()
@@ -304,6 +313,12 @@ class Trainer(object):
                 src_lengths = None
 
             tgt_outer = inputters.make_features(batch, 'tgt')
+
+            if self.rl_gamma > 0.0:
+                # make sure that the complete sentence is analyzed at once
+                assert self.shard_size >= target_size - 1
+                assert self.trunc_size == 0
+ 
 
             for j in range(0, target_size - 1, trunc_size):
                 # 1. Create truncated target.

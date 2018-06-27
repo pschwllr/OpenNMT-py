@@ -11,6 +11,8 @@ import torch.nn as nn
 import onmt
 import onmt.inputters as inputters
 
+from pdb import set_trace
+
 
 def build_loss_compute(model, tgt_vocab, opt, train=True):
     """
@@ -24,6 +26,11 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
         compute = onmt.modules.CopyGeneratorLossCompute(
             model.generator, tgt_vocab, opt.copy_attn_force,
             opt.copy_loss_by_seqlength)
+    elif opt.rl_gamma:
+        compute = onmt.modules.MixedLossCompute(model.generator, tgt_vocab,
+            label_smoothing=opt.label_smoothing if train else 0.0,
+            gamma=opt.rl_gamma if train else 0.0,
+            train=train)
     else:
         compute = NMTLossCompute(
             model.generator, tgt_vocab,

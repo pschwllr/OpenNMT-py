@@ -333,6 +333,10 @@ def train_opts(parser):
                        Set to zero to turn off label smoothing.
                        For more detailed information, see:
                        https://arxiv.org/abs/1512.00567""")
+    # mixed loss
+    group.add_argument('-rl_gamma', type=float, default=0.0,
+                        help='Use a mixed loss (1-gamma) * mll + gamma * rll for training.')
+
     # learning rate
     group = parser.add_argument_group('Optimization- Rate')
     group.add_argument('-learning_rate', type=float, default=1.0,
@@ -380,6 +384,7 @@ def train_opts(parser):
                        help="Sample rate.")
     group.add_argument('-window_size', type=float, default=.02,
                        help="Window size for spectrogram in seconds.")
+
 
 
 def translate_opts(parser):
