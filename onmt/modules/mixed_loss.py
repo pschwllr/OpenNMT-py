@@ -21,6 +21,7 @@ class CanonicalAccuracy(object):
         self.padding_idx = tgt_vocab.stoi[inputters.PAD_WORD]
         self.stop_idx = tgt_vocab.stoi[inputters.EOS_WORD]
         self.tgt_vocab = tgt_vocab
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def _score(self, preds, gtruth):
         """
@@ -33,18 +34,20 @@ class CanonicalAccuracy(object):
         for pred, gt in zip(preds, gtruth):
             # canonical prediction
             if pred == gt:
-                scores.append(1)
+                scores.append(1000)
                 continue
             # valid smiles ?
             mol = MolFromSmiles(pred)
             if mol is None:
                 scores.append(-1) # penalize invalidity
                 continue
-
-            can_pred = MolToSmiles(mol, isomericSmiles=True)
-
+            try:
+                can_pred = MolToSmiles(mol, isomericSmiles=True)
+            except RuntimeError:
+                scores.append(-1)
+                continue
             if can_pred == gt:
-                scores.append(1)
+                scores.append(1000)
                 continue
 
             scores.append(0)
@@ -73,8 +76,8 @@ class CanonicalAccuracy(object):
         sampled_scores = self._score(sampled_hyps, gtruth)
         greedy_scores = self._score(greedy_hyps, gtruth)
 
-        ts = torch.Tensor(sampled_scores)
-        gs = torch.Tensor(greedy_scores)
+        ts = torch.Tensor(sampled_scores).to(self.device)
+        gs = torch.Tensor(greedy_scores).to(self.device)
 
         return (gs - ts)
 
