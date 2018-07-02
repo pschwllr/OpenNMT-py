@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 
-from onmt.utils.misc import aeq, sequence_mask
+from ..utils.misc import aeq, sequence_mask
 
 
 class GlobalAttention(nn.Module):

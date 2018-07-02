@@ -3,9 +3,12 @@
 from __future__ import division
 import torch
 import torch.nn as nn
-import onmt.models.stacked_rnn
-from onmt.utils.misc import aeq
-from onmt.utils.rnn_factory import rnn_factory
+
+from ..models import stacked_rnn
+from .. import modules
+from ..utils.misc import aeq
+from ..utils.rnn_factory import rnn_factory
+
 
 
 class RNNDecoderBase(nn.Module):
@@ -80,14 +83,14 @@ class RNNDecoderBase(nn.Module):
         # Set up the context gate.
         self.context_gate = None
         if context_gate is not None:
-            self.context_gate = onmt.modules.context_gate_factory(
+            self.context_gate = modules.context_gate_factory(
                 context_gate, self._input_size,
                 hidden_size, hidden_size, hidden_size
             )
 
         # Set up the standard attention.
         self._coverage = coverage_attn
-        self.attn = onmt.modules.GlobalAttention(
+        self.attn = modules.GlobalAttention(
             hidden_size, coverage=coverage_attn,
             attn_type=attn_type
         )
@@ -95,7 +98,7 @@ class RNNDecoderBase(nn.Module):
         # Set up a separated copy attention layer, if needed.
         self._copy = False
         if copy_attn and not reuse_copy_attn:
-            self.copy_attn = onmt.modules.GlobalAttention(
+            self.copy_attn = modules.GlobalAttention(
                 hidden_size, attn_type=attn_type
             )
         if copy_attn:
@@ -361,9 +364,9 @@ class InputFeedRNNDecoder(RNNDecoderBase):
         assert not rnn_type == "SRU", "SRU doesn't support input feed! " \
             "Please set -input_feed 0!"
         if rnn_type == "LSTM":
-            stacked_cell = onmt.models.stacked_rnn.StackedLSTM
+            stacked_cell = stacked_rnn.StackedLSTM
         else:
-            stacked_cell = onmt.models.stacked_rnn.StackedGRU
+            stacked_cell = stacked_rnn.StackedGRU
         return stacked_cell(num_layers, input_size,
                             hidden_size, dropout)
 

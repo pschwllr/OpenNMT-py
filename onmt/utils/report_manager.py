@@ -3,8 +3,7 @@ from __future__ import print_function
 import time
 from datetime import datetime
 
-import onmt
-
+from .statistics import Statistics
 
 def build_report_manager(opt):
     if opt.tensorboard:
@@ -66,7 +65,7 @@ class ReportMgrBase(object):
             self._report_training(
                 epoch, batch, num_batches, learning_rate, report_stats)
             self.progress_step += 1
-        return onmt.utils.Statistics()
+        return Statistics()
 
     def _report_training(self, *args, **kwargs):
         """ To be overridden """
@@ -119,7 +118,7 @@ class ReportMgr(ReportMgrBase):
                                    "progress",
                                    learning_rate,
                                    self.progress_step)
-        report_stats = onmt.utils.Statistics()
+        report_stats = Statistics()
 
         return report_stats
 

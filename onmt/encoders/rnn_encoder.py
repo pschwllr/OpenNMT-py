@@ -7,8 +7,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
-from onmt.encoders.encoder import EncoderBase
-from onmt.utils.rnn_factory import rnn_factory
+from .encoder import EncoderBase
+from ..utils.rnn_factory import rnn_factory
 
 
 class RNNEncoder(EncoderBase):

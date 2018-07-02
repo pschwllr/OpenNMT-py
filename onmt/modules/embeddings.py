@@ -4,8 +4,8 @@ import math
 import torch
 import torch.nn as nn
 
-from onmt.modules.util_class import Elementwise
-from onmt.utils.misc import aeq
+from ..modules.util_class import Elementwise
+from ..utils.misc import aeq
 
 
 class PositionalEncoding(nn.Module):

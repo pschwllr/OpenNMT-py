@@ -1,7 +1,7 @@
 """Define a minimal encoder."""
 from __future__ import division
 
-from onmt.encoders.encoder import EncoderBase
+from .encoder import EncoderBase
 
 
 class MeanEncoder(EncoderBase):

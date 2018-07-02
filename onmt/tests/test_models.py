@@ -5,17 +5,16 @@ import math
 
 import torch
 
-import onmt
-import onmt.inputters
-import onmt.opts
-from onmt.model_builder import build_embeddings, \
+
+from .. import opts, inputters, models
+from ..model_builder import build_embeddings, \
     build_encoder, build_decoder
-from onmt.encoders.image_encoder import ImageEncoder
-from onmt.encoders.audio_encoder import AudioEncoder
+from ..encoders.image_encoder import ImageEncoder
+from ..encoders.audio_encoder import AudioEncoder
 
 parser = argparse.ArgumentParser(description='train.py')
-onmt.opts.model_opts(parser)
-onmt.opts.train_opts(parser)
+opts.model_opts(parser)
+opts.train_opts(parser)
 
 # -data option is required, but not used in this test, so dummy.
 opt = parser.parse_known_args(['-data', 'dummy'])[0]
@@ -30,7 +29,7 @@ class TestModel(unittest.TestCase):
     # Helper to generate a vocabulary
 
     def get_vocab(self):
-        src = onmt.inputters.get_fields("text", 0, 0)["src"]
+        src = inputters.get_fields("text", 0, 0)["src"]
         src.build_vocab([])
         return src.vocab
 
@@ -132,7 +131,7 @@ class TestModel(unittest.TestCase):
                                       for_encoder=False)
         dec = build_decoder(opt, embeddings)
 
-        model = onmt.models.model.NMTModel(enc, dec)
+        model = models.model.NMTModel(enc, dec)
 
         test_src, test_tgt, test_length = self.get_batch(source_l=source_l,
                                                          bsize=bsize)
@@ -169,7 +168,7 @@ class TestModel(unittest.TestCase):
                                       for_encoder=False)
         dec = build_decoder(opt, embeddings)
 
-        model = onmt.models.model.NMTModel(enc, dec)
+        model = models.model.NMTModel(enc, dec)
 
         test_src, test_tgt, test_length = self.get_batch_image(
             h=h, w=w,
@@ -210,7 +209,7 @@ class TestModel(unittest.TestCase):
                                       for_encoder=False)
         dec = build_decoder(opt, embeddings)
 
-        model = onmt.models.model.NMTModel(enc, dec)
+        model = models.model.NMTModel(enc, dec)
 
         test_src, test_tgt, test_length = self.get_batch_audio(
             bsize=bsize,
@@ -304,7 +303,7 @@ tests_nmtmodel = [[('rnn_type', 'GRU')],
                   [],
                   ]
 
-if onmt.models.SRU.check_sru_requirement():
+if models.SRU.check_sru_requirement():
     #   """ Only do SRU test if requirment is safisfied. """
     # SRU doesn't support input_feed.
     tests_nmtmodel.append([('rnn_type', 'SRU'), ('input_feed', 0)])

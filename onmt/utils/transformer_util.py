@@ -3,9 +3,7 @@ Implementation of "Attention is All You Need"
 """
 
 import torch.nn as nn
-
-import onmt
-
+from .. import modules
 
 class PositionwiseFeedForward(nn.Module):
     """ A two-layer Feed-Forward-Network with residual layer norm.
@@ -21,7 +19,7 @@ class PositionwiseFeedForward(nn.Module):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(size, hidden_size)
         self.w_2 = nn.Linear(hidden_size, size)
-        self.layer_norm = onmt.modules.LayerNorm(size)
+        self.layer_norm = modules.LayerNorm(size)
         # Save a little memory, by doing inplace.
         self.dropout_1 = nn.Dropout(dropout)
 #        self.dropout_1 = nn.Dropout(dropout, inplace=True)

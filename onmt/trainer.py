@@ -14,8 +14,8 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 
-import onmt.inputters as inputters
-import onmt.utils
+from . import inputters
+from . import utils
 
 
 def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
@@ -25,15 +25,15 @@ def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
         opt (:obj:`Namespace`): user options (usually from argument parsing)
         model (:obj:`onmt.models.NMTModel`): the model to train
         fields (dict): dict of fields
-        optim (:obj:`onmt.utils.Optimizer`): optimizer used during training
+        optim (:obj:`utils.Optimizer`): optimizer used during training
         data_type (str): string describing the type of data
             e.g. "text", "img", "audio"
         model_saver(:obj:`onmt.models.ModelSaverBase`): the utility object
             used to save the model (after each epoch)
     """
-    train_loss = onmt.utils.loss.build_loss_compute(
+    train_loss = utils.loss.build_loss_compute(
         model, fields["tgt"].vocab, opt)
-    valid_loss = onmt.utils.loss.build_loss_compute(
+    valid_loss = utils.loss.build_loss_compute(
         model, fields["tgt"].vocab, opt, train=False)
 
     trunc_size = opt.truncated_decoder  # Badly named...
@@ -41,7 +41,7 @@ def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
     norm_method = opt.normalization
     grad_accum_count = opt.accum_count
 
-    report_manager = onmt.utils.build_report_manager(opt)
+    report_manager = utils.build_report_manager(opt)
     trainer = onmt.Trainer(model, train_loss, valid_loss, optim,
                            trunc_size, shard_size, data_type,
                            norm_method, grad_accum_count, report_manager,
@@ -56,18 +56,18 @@ class Trainer(object):
     Args:
             model(:py:class:`onmt.models.model.NMTModel`):
                translation model to train
-            train_loss(:obj:`onmt.utils.loss.LossComputeBase`):
+            train_loss(:obj:`utils.loss.LossComputeBase`):
                training loss computation
-            valid_loss(:obj:`onmt.utils.loss.LossComputeBase`):
+            valid_loss(:obj:`utils.loss.LossComputeBase`):
                training loss computation
-            optim(:obj:`onmt.utils.optimizers.Optimizer`):
+            optim(:obj:`utils.optimizers.Optimizer`):
                the optimizer responsible for update
             trunc_size(int): length of truncated back propagation through time
             shard_size(int): compute loss in shards of this size for efficiency
             data_type(string): type of the source input: [text|img|audio]
             norm_method(string): normalization methods: [sents|tokens]
             grad_accum_count(int): accumulate gradients this many times.
-            report_manager(:obj:`onmt.utils.ReportMgrBase`):
+            report_manager(:obj:`utils.ReportMgrBase`):
                 the object that creates reports, or None
             model_saver(:obj:`onmt.models.ModelSaverBase`): the saver is
                 used after each epoch to save a checkpoint.
@@ -152,10 +152,10 @@ class Trainer(object):
             epoch(int): the epoch number
 
         Returns:
-            stats (:obj:`onmt.utils.Statistics`): epoch loss statistics
+            stats (:obj:`utils.Statistics`): epoch loss statistics
         """
-        total_stats = onmt.utils.Statistics()
-        report_stats = onmt.utils.Statistics()
+        total_stats = utils.Statistics()
+        report_stats = utils.Statistics()
         self.start_report_manager(start_time=total_stats.start_time)
 
         idx = 0
@@ -216,7 +216,7 @@ class Trainer(object):
         # Set model in validating mode.
         self.model.eval()
 
-        stats = onmt.utils.Statistics()
+        stats = utils.Statistics()
 
         for batch in valid_iter:
             cur_dataset = valid_iter.get_cur_dataset()
@@ -346,7 +346,7 @@ class Trainer(object):
     def report_training(self, *args, **kwargs):
         """
         Simple function to report training stats (if report_manager is set)
-        see `onmt.utils.ReportManagerBase.report_training` for doc
+        see `utils.ReportManagerBase.report_training` for doc
         """
         if self.report_manager is not None:
             return self.report_manager.report_training(*args, **kwargs)
@@ -354,7 +354,7 @@ class Trainer(object):
     def report_epoch(self, *args, **kwargs):
         """
         Simple function to report epoch stats (if report_manager is set)
-        see `onmt.utils.ReportManagerBase.report_epoch` for doc
+        see `utils.ReportManagerBase.report_epoch` for doc
         """
         if self.report_manager is not None:
             return self.report_manager.report_epoch(*args, **kwargs)

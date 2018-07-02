@@ -12,14 +12,12 @@ from collections import Counter
 
 import torchtext
 
-import onmt
-import onmt.inputters
-import onmt.opts
+from .. import opts, inputters
 import preprocess
 
 
 parser = argparse.ArgumentParser(description='preprocess.py')
-onmt.opts.preprocess_opts(parser)
+opts.preprocess_opts(parser)
 
 SAVE_DATA_PREFIX = 'data/test_preprocess'
 
@@ -41,7 +39,7 @@ class TestData(unittest.TestCase):
         self.opt = opt
 
     def dataset_build(self, opt):
-        fields = onmt.inputters.get_fields("text", 0, 0)
+        fields = inputters.get_fields("text", 0, 0)
 
         if hasattr(opt, 'src_vocab') and len(opt.src_vocab) > 0:
             with codecs.open(opt.src_vocab, 'w', 'utf-8') as f:
@@ -68,7 +66,7 @@ class TestData(unittest.TestCase):
         va = torchtext.vocab.Vocab(Counter('abbccc'))
         vb = torchtext.vocab.Vocab(Counter('eeabbcccf'))
 
-        merged = onmt.inputters.merge_vocabs([va, vb], 2)
+        merged = inputters.merge_vocabs([va, vb], 2)
 
         self.assertEqual(Counter({'c': 6, 'b': 4, 'a': 2, 'e': 2, 'f': 1}),
                          merged.freqs)

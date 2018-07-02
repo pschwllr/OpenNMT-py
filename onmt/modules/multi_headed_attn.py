@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 
-from onmt.utils.misc import aeq
+from ..utils.misc import aeq
 
 from pdb import set_trace
 

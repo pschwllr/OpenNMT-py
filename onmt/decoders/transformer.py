@@ -6,10 +6,10 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-import onmt
-from onmt.decoders.decoder import DecoderState
-from onmt.utils.misc import aeq
-from onmt.utils.transformer_util import PositionwiseFeedForward
+from .decoder import DecoderState
+from ..utils.misc import aeq
+from ..utils.transformer_util import PositionwiseFeedForward
+from .. import modules
 
 from pdb import set_trace
 
@@ -30,16 +30,16 @@ class TransformerDecoderLayer(nn.Module):
     def __init__(self, size, dropout,
                  head_count=8, hidden_size=2048, keep_attn=False):
         super(TransformerDecoderLayer, self).__init__()
-        self.self_attn = onmt.modules.MultiHeadedAttention(
+        self.self_attn = modules.MultiHeadedAttention(
             head_count, size, dropout=dropout)
-        self.context_attn = onmt.modules.MultiHeadedAttention(
+        self.context_attn = modules.MultiHeadedAttention(
                 head_count, size, dropout=dropout, keep_attn=keep_attn)
 
         self.feed_forward = PositionwiseFeedForward(size,
                                                     hidden_size,
                                                     dropout)
-        self.layer_norm_1 = onmt.modules.LayerNorm(size)
-        self.layer_norm_2 = onmt.modules.LayerNorm(size)
+        self.layer_norm_1 = modules.LayerNorm(size)
+        self.layer_norm_2 = modules.LayerNorm(size)
         self.dropout = dropout
         self.drop = nn.Dropout(dropout)
         mask = self._get_attn_subsequent_mask(MAX_SIZE)
@@ -127,7 +127,7 @@ class TransformerDecoder(nn.Module):
        num_layers (int): number of encoder layers.
        hidden_size (int): number of hidden units
        dropout (float): dropout parameters
-       embeddings (:obj:`onmt.modules.Embeddings`):
+       embeddings (:obj:`modules.Embeddings`):
           embeddings to use, should have positional encodings
 
        attn_type (str): if using a seperate copy attention
@@ -151,14 +151,14 @@ class TransformerDecoder(nn.Module):
         # Set up a separated copy attention layer, if needed.
         self._copy = False
         if copy_attn:
-            self.copy_attn = onmt.modules.GlobalAttention(
+            self.copy_attn = modules.GlobalAttention(
                 hidden_size, attn_type=attn_type)
             self._copy = True
-        self.layer_norm = onmt.modules.LayerNorm(hidden_size)
+        self.layer_norm = modules.LayerNorm(hidden_size)
 
     def forward(self, tgt, memory_bank, state, memory_lengths=None):
         """
-        See :obj:`onmt.modules.RNNDecoderBase.forward()`
+        See :obj:`modules.RNNDecoderBase.forward()`
         """
         # CHECKS
         assert isinstance(state, TransformerDecoderState)

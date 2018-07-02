@@ -4,7 +4,7 @@ from __future__ import division
 
 import torch.nn as nn
 
-from onmt.utils.misc import aeq
+from ..utils.misc import aeq
 
 
 class EncoderBase(nn.Module):

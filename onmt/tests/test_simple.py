@@ -1,6 +1,6 @@
-import onmt
-
-
-def test_load():
-    onmt
-    pass
+# from ... import onmt
+#
+#
+# def test_load():
+#     onmt
+#     pass

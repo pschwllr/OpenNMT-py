@@ -10,9 +10,9 @@ import json
 import threading
 
 import torch
-from onmt.translate.translator import build_translator
+from .translator import build_translator
 
-import onmt.opts
+from .. import opts
 
 
 class Timer:
@@ -190,7 +190,7 @@ class ServerModel:
         prec_argv = sys.argv
         sys.argv = sys.argv[:1]
         parser = argparse.ArgumentParser()
-        onmt.opts.translate_opts(parser)
+        opts.translate_opts(parser)
 
         opt['model'] = os.path.join(self.model_root, opt['model'])
         opt['src'] = "dummy_src"

@@ -9,20 +9,20 @@ import torch.nn as nn
 
 from torch.nn.init import xavier_uniform
 
-import onmt.inputters as inputters
-import onmt.modules
-from onmt.encoders.rnn_encoder import RNNEncoder
-from onmt.encoders.transformer import TransformerEncoder
-from onmt.encoders.cnn_encoder import CNNEncoder
-from onmt.encoders.mean_encoder import MeanEncoder
-from onmt.encoders.audio_encoder import AudioEncoder
-from onmt.encoders.image_encoder import ImageEncoder
+from . import inputters
+from . import models
+from .encoders.rnn_encoder import RNNEncoder
+from .encoders.transformer import TransformerEncoder
+from .encoders.cnn_encoder import CNNEncoder
+from .encoders.mean_encoder import MeanEncoder
+from .encoders.audio_encoder import AudioEncoder
+from .encoders.image_encoder import ImageEncoder
 
-from onmt.decoders.decoder import InputFeedRNNDecoder, StdRNNDecoder
-from onmt.decoders.transformer import TransformerDecoder
-from onmt.decoders.cnn_decoder import CNNDecoder
-from onmt.modules import Embeddings, CopyGenerator
-from onmt.utils.misc import use_gpu
+from .decoders.decoder import InputFeedRNNDecoder, StdRNNDecoder
+from .decoders.transformer import TransformerDecoder
+from .decoders.cnn_decoder import CNNDecoder
+from .modules import Embeddings, CopyGenerator
+from .utils.misc import use_gpu
 
 
 def build_embeddings(opt, word_dict, feature_dicts, for_encoder=True):
@@ -199,7 +199,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     
     # Build NMTModel(= encoder + decoder).
     device = torch.device("cuda" if gpu else "cpu")
-    model = onmt.models.NMTModel(encoder, decoder)
+    model = models.NMTModel(encoder, decoder)
     model.model_type = model_opt.model_type
 
     # Build Generator.

@@ -5,10 +5,11 @@ Implementation of "Attention is All You Need"
 import torch.nn as nn
 from torch.autograd import Variable
 
-import onmt
-from onmt.encoders.encoder import EncoderBase
-from onmt.utils.misc import aeq
-from onmt.utils.transformer_util import PositionwiseFeedForward
+from .encoder import EncoderBase
+from ..utils.misc import aeq
+from ..utils.transformer_util import PositionwiseFeedForward
+from .. import modules
+
 MAX_SIZE = 5000
 
 
@@ -29,12 +30,12 @@ class TransformerEncoderLayer(nn.Module):
                  head_count=8, hidden_size=2048):
         super(TransformerEncoderLayer, self).__init__()
 
-        self.self_attn = onmt.modules.MultiHeadedAttention(
+        self.self_attn = modules.MultiHeadedAttention(
             head_count, size, dropout=dropout)
         self.feed_forward = PositionwiseFeedForward(size,
                                                     hidden_size,
                                                     dropout)
-        self.layer_norm = onmt.modules.LayerNorm(size)
+        self.layer_norm = modules.LayerNorm(size)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs, mask):
@@ -80,7 +81,7 @@ class TransformerEncoder(EncoderBase):
         self.transformer = nn.ModuleList(
             [TransformerEncoderLayer(hidden_size, dropout)
              for _ in range(num_layers)])
-        self.layer_norm = onmt.modules.LayerNorm(hidden_size)
+        self.layer_norm = modules.LayerNorm(hidden_size)
 
     def forward(self, src, lengths=None):
         """ See :obj:`EncoderBase.forward()`"""

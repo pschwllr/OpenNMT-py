@@ -8,8 +8,9 @@ from __future__ import division
 import torch
 import torch.nn as nn
 
-import onmt
-import onmt.inputters as inputters
+from .misc import use_gpu
+from .statistics import Statistics
+from .. import inputters, modules
 
 
 def build_loss_compute(model, tgt_vocab, opt, train=True):
@@ -18,10 +19,10 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     compute loss in train/validate process. You can implement your
     own *LossCompute class, by subclassing LossComputeBase.
     """
-    device = torch.device("cuda" if onmt.utils.misc.use_gpu(opt) else "cpu")
+    device = torch.device("cuda" if use_gpu(opt) else "cpu")
 
     if opt.copy_attn:
-        compute = onmt.modules.CopyGeneratorLossCompute(
+        compute = modules.CopyGeneratorLossCompute(
             model.generator, tgt_vocab, opt.copy_attn_force,
             opt.copy_loss_by_seqlength)
     else:
@@ -137,7 +138,7 @@ class LossComputeBase(nn.Module):
             :obj:`onmt.utils.Statistics`: validation loss statistics
 
         """
-        batch_stats = onmt.utils.Statistics()
+        batch_stats = Statistics()
         range_ = (cur_trunc, cur_trunc + trunc_size)
         shard_state = self._make_shard_state(batch, output, range_, attns)
         for shard in shards(shard_state, shard_size):
@@ -164,7 +165,7 @@ class LossComputeBase(nn.Module):
                           .sum() \
                           .item()
         num_non_padding = non_padding.sum().item()
-        return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct)
+        return Statistics(loss.item(), num_non_padding, num_correct)
 
     def _bottle(self, _v):
         return _v.view(-1, _v.size(2))
