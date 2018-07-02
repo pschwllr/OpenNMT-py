@@ -34,7 +34,7 @@ class CanonicalAccuracy(object):
         for pred, gt in zip(preds, gtruth):
             # canonical prediction
             if pred == gt:
-                scores.append(1000)
+                scores.append(1)
                 continue
             # valid smiles ?
             mol = MolFromSmiles(pred)
@@ -47,7 +47,7 @@ class CanonicalAccuracy(object):
                 scores.append(-1)
                 continue
             if can_pred == gt:
-                scores.append(1000)
+                scores.append(1)
                 continue
 
             scores.append(0)
@@ -139,23 +139,15 @@ class MixedLossCompute(loss.LossComputeBase):
 
 
         if self.gamma > 0:
+            set_trace()
 
-            # CRITERION & PREDICTION: Predicting & Calculating the loss
             _, ml_pred = scores.max(1)
 
             dist = torch.distributions.Categorical(scores)
-            # TODO check if this hack is mandatory
-            # in this context target=1 if continue generation, 0 else:
-            # kinda hacky but seems to work
-            #rl_pred = torch.autograd.Variable(dist.sample()) * target
             rl_pred = dist.sample() # * target.neq(self.padding_idx)
 
             rl_loss = self.rl_criterion(scores, rl_pred)
-            # loss_data = loss.sum().data
 
-            # sample_preds = torch.stack(rl_preds, 1)
-            # greedy_preds = torch.stack(ml_preds, 1)
-            # t for transpose - 
             metric = self.scoring_function.score(
                                     rl_pred.view(target.size()).t(),
                                      ml_pred.view(target.size()).t(), 
@@ -171,8 +163,6 @@ class MixedLossCompute(loss.LossComputeBase):
 
 
         if self.confidence < 1:
-            # Default: report smoothed ppl.
-            # loss_data = -log_likelihood.sum(0)
             loss_data = loss.data.clone()
         else:
             loss_data = loss.data.clone()
