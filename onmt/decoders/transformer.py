@@ -35,6 +35,8 @@ class TransformerDecoderLayer(nn.Module):
         self.context_attn = modules.MultiHeadedAttention(
                 head_count, size, dropout=dropout, keep_attn=keep_attn)
 
+        self.keep_attn = keep_attn
+
         self.feed_forward = PositionwiseFeedForward(size,
                                                     hidden_size,
                                                     dropout)

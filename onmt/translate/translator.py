@@ -409,7 +409,7 @@ class Translator(object):
         'attention': ret['attention'][0],
         'score': ret['scores'][0],
         'prediction': predicted_tokens,
-        'context_attns': dec_states.context_attn.data
+        'context_attns': dec_states.context_attn.data if dec_states.context_attn is not None else None
         }
 
         return results
