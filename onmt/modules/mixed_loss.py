@@ -136,11 +136,7 @@ class MixedLossCompute(loss.LossComputeBase):
             gtruth = tmp_
         ml_loss = self.ml_criterion(scores, gtruth)
 
-
-
         if self.gamma > 0:
-            set_trace()
-
             _, ml_pred = scores.max(1)
 
             dist = torch.distributions.Categorical(scores)
