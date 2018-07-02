@@ -11,10 +11,10 @@ import torch
 import torchtext.data
 import torchtext.vocab
 
-from onmt.inputters.dataset_base import UNK_WORD, PAD_WORD, BOS_WORD, EOS_WORD
-from onmt.inputters.text_dataset import TextDataset
-from onmt.inputters.image_dataset import ImageDataset
-from onmt.inputters.audio_dataset import AudioDataset
+from .dataset_base import UNK_WORD, PAD_WORD, BOS_WORD, EOS_WORD
+from .text_dataset import TextDataset
+from .image_dataset import ImageDataset
+from .audio_dataset import AudioDataset
 
 
 def _getstate(self):

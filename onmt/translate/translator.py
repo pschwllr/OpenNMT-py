@@ -9,10 +9,9 @@ import math
 import torch
 from itertools import count
 
-import onmt.model_builder
-import onmt.translate.beam
-import onmt.inputters as inputters
-import onmt.opts as opts
+from .. import model_builder, inputters, opts
+from .beam import GNMTGlobalScorer, Beam
+
 
 from pdb import set_trace  
 
@@ -29,9 +28,9 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     dummy_opt = dummy_parser.parse_known_args([])[0]
 
     fields, model, model_opt = \
-        onmt.model_builder.load_test_model(opt, dummy_opt.__dict__)
+        model_builder.load_test_model(opt, dummy_opt.__dict__)
 
-    scorer = onmt.translate.GNMTGlobalScorer(opt.alpha,
+    scorer = GNMTGlobalScorer(opt.alpha,
                                              opt.beta,
                                              opt.coverage_penalty,
                                              opt.length_penalty)
@@ -167,7 +166,7 @@ class Translator(object):
             batch_size=batch_size, train=False, sort=False,
             sort_within_batch=True, shuffle=False)
 
-        builder = onmt.translate.TranslationBuilder(
+        builder = TranslationBuilder(
             data, self.fields,
             self.n_best, self.replace_unk, tgt_path)
 
@@ -294,7 +293,7 @@ class Translator(object):
         exclusion_tokens = set([vocab.stoi[t]
                                 for t in self.ignore_when_blocking])
 
-        beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
+        beam = [Beam(beam_size, n_best=self.n_best,
                                     cuda=self.cuda,
                                     global_scorer=self.global_scorer,
                                     pad=vocab.stoi[inputters.PAD_WORD],
@@ -410,7 +409,7 @@ class Translator(object):
         'attention': ret['attention'][0],
         'score': ret['scores'][0],
         'prediction': predicted_tokens,
-        'context_attns': dec_states.context_attn.data
+        'context_attns': dec_states.context_attn.data if dec_states.context_attn is not None else None
         }
 
         return results
@@ -443,7 +442,7 @@ class Translator(object):
         exclusion_tokens = set([vocab.stoi[t]
                                 for t in self.ignore_when_blocking])
 
-        beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
+        beam = [Beam(beam_size, n_best=self.n_best,
                                     cuda=self.cuda,
                                     global_scorer=self.global_scorer,
                                     pad=vocab.stoi[inputters.PAD_WORD],

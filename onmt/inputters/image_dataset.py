@@ -7,7 +7,7 @@ import os
 import torch
 import torchtext
 
-from onmt.inputters.dataset_base import DatasetBase,\
+from .dataset_base import DatasetBase,\
      PAD_WORD, BOS_WORD, EOS_WORD
 
 

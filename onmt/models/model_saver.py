@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-import onmt
-
 
 def build_model_saver(model_opt, opt, model, fields, optim):
     model_saver = ModelSaver(opt.save_model,

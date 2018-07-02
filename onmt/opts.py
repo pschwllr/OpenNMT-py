@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import argparse
-from onmt.models.SRU import CheckSRU
+from .models.SRU import CheckSRU
 
 
 def model_opts(parser):

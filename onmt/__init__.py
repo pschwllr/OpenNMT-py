@@ -1,8 +1,8 @@
 """ Main entry point of the ONMT library """
-from onmt.trainer import Trainer
+from .trainer import Trainer
 import sys
-import onmt.utils.optimizers
-onmt.utils.optimizers.Optim = onmt.utils.optimizers.Optimizer
-sys.modules["onmt.Optim"] = onmt.utils.optimizers
+from .utils import optimizers
+utils.optimizers.Optim = optimizers.Optimizer
+sys.modules["onmt.Optim"] = utils.optimizers
 
 __all__ = ["Trainer"]

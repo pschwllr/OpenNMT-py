@@ -1,6 +1,6 @@
 from __future__ import division
 import torch
-from onmt.translate import penalties
+from . import penalties
 
 
 class Beam(object):

@@ -1,13 +1,14 @@
 """  Attention and normalization modules  """
-from onmt.modules.util_class import LayerNorm, Elementwise
-from onmt.modules.gate import context_gate_factory, ContextGate
-from onmt.modules.global_attention import GlobalAttention
-from onmt.modules.conv_multi_step_attention import ConvMultiStepAttention
-from onmt.modules.copy_generator import CopyGenerator, CopyGeneratorLossCompute
-from onmt.modules.multi_headed_attn import MultiHeadedAttention
-from onmt.modules.embeddings import Embeddings, PositionalEncoding
-from onmt.modules.weight_norm import WeightNormConv2d
-from onmt.modules.mixed_loss import MixedLossCompute
+from .util_class import LayerNorm, Elementwise
+from .gate import context_gate_factory, ContextGate
+from .global_attention import GlobalAttention
+from .conv_multi_step_attention import ConvMultiStepAttention
+from .copy_generator import CopyGenerator, CopyGeneratorLossCompute
+from .multi_headed_attn import MultiHeadedAttention
+from .embeddings import Embeddings, PositionalEncoding
+from .weight_norm import WeightNormConv2d
+from .mixed_loss import MixedLossCompute
+
 
 __all__ = ["LayerNorm", "Elementwise", "context_gate_factory", "ContextGate",
            "GlobalAttention", "ConvMultiStepAttention", "CopyGenerator",

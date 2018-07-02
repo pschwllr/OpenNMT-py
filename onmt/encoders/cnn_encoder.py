@@ -3,8 +3,8 @@ Implementation of "Convolutional Sequence to Sequence Learning"
 """
 import torch.nn as nn
 
-from onmt.encoders.encoder import EncoderBase
-from onmt.utils.cnn_factory import shape_transform, StackedCNN
+from .encoder import EncoderBase
+from ..utils.cnn_factory import shape_transform, StackedCNN
 
 SCALE_WEIGHT = 0.5 ** 0.5
 
