@@ -7,7 +7,9 @@ import os
 import math
 
 import torch
+
 from itertools import count
+from onmt.utils.misc import tile
 
 from .. import model_builder, inputters, opts
 from .beam import GNMTGlobalScorer, Beam
@@ -18,7 +20,7 @@ from pdb import set_trace
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
-        out_file = codecs.open(opt.output, 'w', 'utf-8')
+        out_file = codecs.open(opt.output, 'w+', 'utf-8')
 
     if opt.gpu > -1:
         torch.cuda.set_device(opt.gpu)
@@ -38,8 +40,9 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     kwargs = {k: getattr(opt, k)
               for k in ["beam_size", "n_best", "max_length", "min_length",
                         "stepwise_penalty", "block_ngram_repeat",
-                        "ignore_when_blocking", "dump_beam", 
-                        "data_type", "replace_unk", "gpu", "verbose"]}
+                        "ignore_when_blocking", "dump_beam", "report_bleu",
+                        "data_type", "replace_unk", "gpu", "verbose", "fast"]}
+
 
     translator = Translator(model, fields, global_scorer=scorer,
                             out_file=out_file, report_score=report_score,
@@ -94,7 +97,8 @@ class Translator(object):
                  report_bleu=False,
                  report_rouge=False,
                  verbose=False,
-                 out_file=None):
+                 out_file=None,
+                 fast=False):
         self.logger = logger
         self.gpu = gpu
         self.cuda = gpu > -1
@@ -123,6 +127,7 @@ class Translator(object):
         self.report_score = report_score
         self.report_bleu = report_bleu
         self.report_rouge = report_rouge
+        self.fast = fast
 
         # for debugging
         self.beam_trace = self.dump_beam != ""
@@ -143,9 +148,32 @@ class Translator(object):
                   batch_size=None,
                   attn_debug=False):
         """
+        Translate content of `src_data_iter` (if not None) or `src_path`
+        and get gold scores if one of `tgt_data_iter` or `tgt_path` is set.
+
         Note: batch_size must not be None
         Note: one of ('src_path', 'src_data_iter') must not be None
+
+        Args:
+            src_path (str): filepath of source data
+            src_data_iter (iterator): an interator generating source data
+                e.g. it may be a list or an openned file
+            tgt_path (str): filepath of target data
+            tgt_data_iter (iterator): an interator generating target data
+            src_dir (str): source directory path
+                (used for Audio and Image datasets)
+            batch_size (int): size of examples per mini-batch
+            attn_debug (bool): enables the attention logging
+
+        Returns:
+            (`list`, `list`)
+
+            * all_scores is a list of `batch_size` lists of `n_best` scores
+            * all_predictions is a list of `batch_size` lists
+                of `n_best` predictions
         """
+        assert src_data_iter is not None or src_path is not None
+
         if batch_size is None:
             raise ValueError("batch_size must be set")
         data = inputters.build_dataset(self.fields,
@@ -161,8 +189,13 @@ class Translator(object):
                                        window=self.window,
                                        use_filter_pred=self.use_filter_pred)
 
+        if self.cuda:
+            cur_device = "cuda"
+        else:
+            cur_device = "cpu"
+
         data_iter = inputters.OrderedIterator(
-            dataset=data, device=self.gpu,
+            dataset=data, device=cur_device,
             batch_size=batch_size, train=False, sort=False,
             sort_within_batch=True, shuffle=False)
 
@@ -176,13 +209,16 @@ class Translator(object):
         gold_score_total, gold_words_total = 0, 0
 
         all_scores = []
+        all_predictions = []
+
         for batch in data_iter:
 
-            batch_data = self.translate_batch(batch, data)
+            batch_data = self.translate_batch(batch, data, fast=self.fast)
+
             translations = builder.from_batch(batch_data)
 
             for trans in translations:
-                all_scores += [trans.pred_scores[0]]
+                all_scores += [trans.pred_scores[:self.n_best]]
                 pred_score_total += trans.pred_scores[0]
                 pred_words_total += len(trans.pred_sents[0])
                 if tgt_path is not None:
@@ -191,6 +227,7 @@ class Translator(object):
 
                 n_best_preds = [" ".join(pred)
                                 for pred in trans.pred_sents[:self.n_best]]
+                all_predictions += [n_best_preds]
                 self.out_file.write('\n'.join(n_best_preds) + '\n')
                 self.out_file.flush()
 
@@ -255,11 +292,31 @@ class Translator(object):
             import json
             json.dump(self.translator.beam_accum,
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
-        return all_scores
+        return all_scores, all_predictions
 
 
+    def translate_single(self, src_tokens, tgt_tokens=None, fast=False):
+        """
+        Translate a batch of sentences.
 
-    def translate_single(self, src_tokens, tgt_tokens=None):
+        Mostly a wrapper around :obj:`Beam`.
+
+        Args:
+           batch (:obj:`Batch`): a batch from a dataset object
+           data (:obj:`Dataset`): the dataset object
+           fast (bool): enables fast beam search (may not support all features)
+
+        Todo:
+           Shouldn't need the original dataset.
+        """
+        with torch.no_grad():
+            if fast:
+                return self._fast_translate_single(src_tokens, tgt_tokens)
+            else:
+                return self._translate_single(src_tokens, tgt_tokens)
+
+
+    def _translate_single(self, src_tokens, tgt_tokens=None):
         """
         Translate a batch of sentences.
 
@@ -282,9 +339,7 @@ class Translator(object):
         src_vocab = self.fields["src"].vocab
 
         src = torch.LongTensor([src_vocab.stoi[token] for token in src_tokens])
-
         src = src.unsqueeze(1).unsqueeze(2)
-
         src_lengths = torch.LongTensor([src.size()[0]])
 
 
@@ -367,6 +422,7 @@ class Translator(object):
                 # beam x tgt_vocab
                 beam_attn = unbottle(attn["std"])
             else:
+                raise NotImplementedError
                 out = self.model.generator.forward(dec_out,
                                                    attn["copy"].squeeze(0),
                                                    src_map)
@@ -414,8 +470,155 @@ class Translator(object):
 
         return results
 
+    def _fast_translate_single(self, src_tokens, tgt_tokens=None):
+        # TODO: faster code path for beam_size == 1.
 
-    def translate_batch(self, batch, data):
+        # TODO: support these blacklisted features.
+        assert self.n_best == 1
+        assert self.min_length == 0
+        assert not self.copy_attn
+        assert not self.replace_unk
+        assert not self.dump_beam
+        assert not self.use_filter_pred
+        assert self.block_ngram_repeat == 0
+        assert self.global_scorer.beta == 0
+
+        beam_size = self.beam_size
+        batch_size = 1
+        vocab = self.fields["tgt"].vocab
+        start_token = vocab.stoi[inputters.BOS_WORD]
+        end_token = vocab.stoi[inputters.EOS_WORD]
+
+        # Encoder forward.
+
+        src_vocab = self.fields["src"].vocab
+
+        src = torch.LongTensor([src_vocab.stoi[token] for token in src_tokens])
+        src = src.unsqueeze(1).unsqueeze(2)
+        src_lengths = torch.LongTensor([src.size()[0]])
+
+        enc_states, memory_bank = self.model.encoder(src, src_lengths)
+        dec_states = self.model.decoder.init_decoder_state(
+            src, memory_bank, enc_states)
+
+        # Tile states and memory beam_size times.
+        dec_states.map_batch_fn(
+            lambda state, dim: tile(state, beam_size, dim=dim))
+        memory_bank = tile(memory_bank, beam_size, dim=1)
+        memory_lengths = tile(src_lengths, beam_size)
+
+        batch_offset = torch.arange(
+            batch_size, dtype=torch.long, device=memory_bank.device)
+        beam_offset = torch.arange(
+            0,
+            batch_size * beam_size,
+            step=beam_size,
+            dtype=torch.long,
+            device=memory_bank.device)
+        alive_seq = torch.full(
+            [batch_size * beam_size, 1],
+            start_token,
+            dtype=torch.long,
+            device=memory_bank.device)
+
+        # Give full probability to the first beam on the first step.
+        topk_log_probs = (
+            torch.tensor([0.0] + [float("-inf")] * (beam_size - 1),
+                         device=memory_bank.device).repeat(batch_size))
+
+        results = {}
+        results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
+        results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
+        results["attention"] = [[[]] for _ in range(batch_size)]  # noqa: F812
+        results["gold_score"] = [0] * batch_size
+
+        for step in range(self.max_length):
+            decoder_input = alive_seq[:, -1].view(1, -1, 1)
+
+            # Decoder forward.
+            dec_out, dec_states, attn = self.model.decoder(
+                decoder_input,
+                memory_bank,
+                dec_states,
+                memory_lengths=memory_lengths,
+                step=step)
+
+            # Generator forward.
+            log_probs = self.model.generator.forward(dec_out.squeeze(0))
+            vocab_size = log_probs.size(-1)
+
+            # Multiply probs by the beam probability.
+            log_probs += topk_log_probs.view(-1).unsqueeze(1)
+
+            alpha = self.global_scorer.alpha
+            length_penalty = ((5.0 + (step + 1)) / 6.0) ** alpha
+
+            # Flatten probs into a list of possibilities.
+            curr_scores = log_probs / length_penalty
+            curr_scores = curr_scores.reshape(-1, beam_size * vocab_size)
+            topk_scores, topk_ids = curr_scores.topk(beam_size, dim=-1)
+
+            # Recover log probs.
+            topk_log_probs = topk_scores * length_penalty
+
+            # Resolve beam origin and true word ids.
+            topk_beam_index = topk_ids.div(vocab_size)
+            topk_ids = topk_ids.fmod(vocab_size)
+
+            # Map beam_index to batch_index in the flat representation.
+            batch_index = (
+                topk_beam_index
+                + beam_offset[:topk_beam_index.size(0)].unsqueeze(1))
+
+            # End condition is the top beam reached end_token.
+            finished = topk_ids[:, 0].eq(end_token)
+            finished_count = finished.sum()
+
+            # Save result of finished sentences.
+            if finished_count > 0 or step + 1 == self.max_length:
+                predictions = alive_seq.view(-1, beam_size, alive_seq.size(-1))
+                scores = topk_scores.view(-1, beam_size)
+                for i, is_finished in enumerate(finished.tolist()):
+                    if step + 1 != self.max_length and is_finished == 0:
+                        continue
+                    # TODO: if we get there because of max_length, the last
+                    # predicted token is currently discarded.
+                    b = batch_offset[i]
+                    results["predictions"][b].append(predictions[i, 0, 1:])
+                    results["scores"][b].append(scores[i, 0])
+
+            non_finished = finished.eq(0).nonzero().view(-1)
+
+            # If all sentences are translated, no need to go further.
+            if non_finished.nelement() == 0:
+                break
+
+            # Remove finished batches for the next step.
+            if non_finished.nelement() < finished.nelement():
+                topk_log_probs = topk_log_probs.index_select(
+                    0, non_finished.to(topk_log_probs.device))
+                topk_ids = topk_ids.index_select(0, non_finished)
+                batch_index = batch_index.index_select(0, non_finished)
+                batch_offset = batch_offset.index_select(0, non_finished)
+
+            # Select and reorder alive batches.
+            select_indices = batch_index.view(-1)
+            alive_seq = alive_seq.index_select(0, select_indices)
+            memory_bank = memory_bank.index_select(1, select_indices)
+            memory_lengths = memory_lengths.index_select(0, select_indices)
+            dec_states.map_batch_fn(
+                lambda state, dim: state.index_select(dim, select_indices))
+
+            # Append last prediction.
+            alive_seq = torch.cat([alive_seq, topk_ids.view(-1, 1)], -1)
+
+        results['context_attns'] = dec_states.context_attn.data if dec_states.context_attn is not None else None
+
+        return results
+
+
+
+    def translate_batch(self, batch, data, fast=False):
         """
         Translate a batch of sentences.
 
@@ -424,12 +627,159 @@ class Translator(object):
         Args:
            batch (:obj:`Batch`): a batch from a dataset object
            data (:obj:`Dataset`): the dataset object
-
+           fast (bool): enables fast beam search (may not support all features)
 
         Todo:
            Shouldn't need the original dataset.
         """
+        with torch.no_grad():
+            if fast:
+                return self._fast_translate_batch(batch, data)
+            else:
+                return self._translate_batch(batch, data)
 
+    def _fast_translate_batch(self, batch, data):
+        # TODO: faster code path for beam_size == 1.
+
+        # TODO: support these blacklisted features.
+        assert data.data_type == 'text'
+        assert self.n_best == 1
+        assert self.min_length == 0
+        assert not self.copy_attn
+        assert not self.replace_unk
+        assert not self.dump_beam
+        assert not self.use_filter_pred
+        assert self.block_ngram_repeat == 0
+        assert self.global_scorer.beta == 0
+
+        beam_size = self.beam_size
+        batch_size = batch.batch_size
+        vocab = self.fields["tgt"].vocab
+        start_token = vocab.stoi[inputters.BOS_WORD]
+        end_token = vocab.stoi[inputters.EOS_WORD]
+
+        # Encoder forward.
+        src = inputters.make_features(batch, 'src', data.data_type)
+        _, src_lengths = batch.src
+        enc_states, memory_bank = self.model.encoder(src, src_lengths)
+        dec_states = self.model.decoder.init_decoder_state(
+            src, memory_bank, enc_states)
+
+        # Tile states and memory beam_size times.
+        dec_states.map_batch_fn(
+            lambda state, dim: tile(state, beam_size, dim=dim))
+        memory_bank = tile(memory_bank, beam_size, dim=1)
+        memory_lengths = tile(src_lengths, beam_size)
+
+        batch_offset = torch.arange(
+            batch_size, dtype=torch.long, device=memory_bank.device)
+        beam_offset = torch.arange(
+            0,
+            batch_size * beam_size,
+            step=beam_size,
+            dtype=torch.long,
+            device=memory_bank.device)
+        alive_seq = torch.full(
+            [batch_size * beam_size, 1],
+            start_token,
+            dtype=torch.long,
+            device=memory_bank.device)
+
+        # Give full probability to the first beam on the first step.
+        topk_log_probs = (
+            torch.tensor([0.0] + [float("-inf")] * (beam_size - 1),
+                         device=memory_bank.device).repeat(batch_size))
+
+        results = {}
+        results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
+        results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
+        results["attention"] = [[[]] for _ in range(batch_size)]  # noqa: F812
+        results["gold_score"] = [0] * batch_size
+        results["batch"] = batch
+
+        for step in range(self.max_length):
+            decoder_input = alive_seq[:, -1].view(1, -1, 1)
+
+            # Decoder forward.
+            dec_out, dec_states, attn = self.model.decoder(
+                decoder_input,
+                memory_bank,
+                dec_states,
+                memory_lengths=memory_lengths,
+                step=step)
+
+            # Generator forward.
+            log_probs = self.model.generator.forward(dec_out.squeeze(0))
+            vocab_size = log_probs.size(-1)
+
+            # Multiply probs by the beam probability.
+            log_probs += topk_log_probs.view(-1).unsqueeze(1)
+
+            alpha = self.global_scorer.alpha
+            length_penalty = ((5.0 + (step + 1)) / 6.0) ** alpha
+
+            # Flatten probs into a list of possibilities.
+            curr_scores = log_probs / length_penalty
+            curr_scores = curr_scores.reshape(-1, beam_size * vocab_size)
+            topk_scores, topk_ids = curr_scores.topk(beam_size, dim=-1)
+
+            # Recover log probs.
+            topk_log_probs = topk_scores * length_penalty
+
+            # Resolve beam origin and true word ids.
+            topk_beam_index = topk_ids.div(vocab_size)
+            topk_ids = topk_ids.fmod(vocab_size)
+
+            # Map beam_index to batch_index in the flat representation.
+            batch_index = (
+                topk_beam_index
+                + beam_offset[:topk_beam_index.size(0)].unsqueeze(1))
+
+            # End condition is the top beam reached end_token.
+            finished = topk_ids[:, 0].eq(end_token)
+            finished_count = finished.sum()
+
+            # Save result of finished sentences.
+            if finished_count > 0 or step + 1 == self.max_length:
+                predictions = alive_seq.view(-1, beam_size, alive_seq.size(-1))
+                scores = topk_scores.view(-1, beam_size)
+                for i, is_finished in enumerate(finished.tolist()):
+                    if step + 1 != self.max_length and is_finished == 0:
+                        continue
+                    # TODO: if we get there because of max_length, the last
+                    # predicted token is currently discarded.
+                    b = batch_offset[i]
+                    results["predictions"][b].append(predictions[i, 0, 1:])
+                    results["scores"][b].append(scores[i, 0])
+
+            non_finished = finished.eq(0).nonzero().view(-1)
+
+            # If all sentences are translated, no need to go further.
+            if non_finished.nelement() == 0:
+                break
+
+            # Remove finished batches for the next step.
+            if non_finished.nelement() < finished.nelement():
+                topk_log_probs = topk_log_probs.index_select(
+                    0, non_finished.to(topk_log_probs.device))
+                topk_ids = topk_ids.index_select(0, non_finished)
+                batch_index = batch_index.index_select(0, non_finished)
+                batch_offset = batch_offset.index_select(0, non_finished)
+
+            # Select and reorder alive batches.
+            select_indices = batch_index.view(-1)
+            alive_seq = alive_seq.index_select(0, select_indices)
+            memory_bank = memory_bank.index_select(1, select_indices)
+            memory_lengths = memory_lengths.index_select(0, select_indices)
+            dec_states.map_batch_fn(
+                lambda state, dim: state.index_select(dim, select_indices))
+
+            # Append last prediction.
+            alive_seq = torch.cat([alive_seq, topk_ids.view(-1, 1)], -1)
+
+        return results
+
+    def _translate_batch(self, batch, data):
         # (0) Prep each of the components of the search.
         # And helper method for reducing verbosity.
         beam_size = self.beam_size
@@ -509,8 +859,11 @@ class Translator(object):
 
             # Run one step.
             dec_out, dec_states, attn = self.model.decoder(
-                inp, memory_bank, dec_states, memory_lengths=memory_lengths)
+                inp, memory_bank, dec_states, memory_lengths=memory_lengths,
+                step=i)
+
             dec_out = dec_out.squeeze(0)
+
             # dec_out: beam x rnn_size
 
             # (b) Compute a vector of batch x beam word scores.
@@ -530,6 +883,7 @@ class Translator(object):
                 # beam x tgt_vocab
                 out = out.log()
                 beam_attn = unbottle(attn["copy"])
+
             # (c) Advance each beam.
             for j, b in enumerate(beam):
                 b.advance(out[:, j],
@@ -542,6 +896,7 @@ class Translator(object):
         if "tgt" in batch.__dict__:
             ret["gold_score"] = self._run_target(batch, data)
         ret["batch"] = batch
+
         return ret
 
     def _from_beam(self, beam):
@@ -608,10 +963,13 @@ class Translator(object):
 
     def _report_bleu(self, tgt_path):
         import subprocess
-        path = os.path.split(os.path.realpath(__file__))[0]
+        base_dir = os.path.abspath(__file__ + "/../../..")
+        # Rollback pointer to the beginning.
+        self.out_file.seek(0)
+        print()
 
-        res = subprocess.check_output("perl %s/tools/multi-bleu.perl %s %s"
-                                      % (path, tgt_path, self.output),
+        res = subprocess.check_output("perl %s/tools/multi-bleu.perl %s"
+                                      % (base_dir, tgt_path),
                                       stdin=self.out_file,
                                       shell=True).decode("utf-8")
 

@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
-"""Define inputters DatasetBase Class."""
-
-
+# coding: utf-8
+"""
+    Base dataset class and constants
+"""
 from itertools import chain
 import torchtext
 

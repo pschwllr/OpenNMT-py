@@ -7,8 +7,10 @@ from .copy_generator import CopyGenerator, CopyGeneratorLossCompute
 from .multi_headed_attn import MultiHeadedAttention
 from .embeddings import Embeddings, PositionalEncoding
 from .weight_norm import WeightNormConv2d
+from .average_attn import AverageAttention
+
 
 __all__ = ["LayerNorm", "Elementwise", "context_gate_factory", "ContextGate",
            "GlobalAttention", "ConvMultiStepAttention", "CopyGenerator",
            "CopyGeneratorLossCompute", "MultiHeadedAttention", "Embeddings",
-           "PositionalEncoding", "WeightNormConv2d"]
+           "PositionalEncoding", "WeightNormConv2d", "AverageAttention"]
