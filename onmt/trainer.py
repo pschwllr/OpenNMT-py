@@ -207,7 +207,7 @@ class Trainer(object):
                         step += 1
                         if step > train_steps:
                             break
-            logger.info('Completed an epoch: {}/{}'.format(step, train_steps))
+            logger.info('Completed an epoch: {}/{}'.format(step-1, train_steps))
             if valid_steps == 0:
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d'
