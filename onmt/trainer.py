@@ -42,7 +42,7 @@ def build_trainer(opt, model, fields, optim, data_type, model_saver=None):
     grad_accum_count = opt.accum_count
 
     report_manager = utils.build_report_manager(opt)
-    trainer = onmt.Trainer(model, train_loss, valid_loss, optim,
+    trainer = Trainer(model, train_loss, valid_loss, optim,
                            trunc_size, shard_size, data_type,
                            norm_method, grad_accum_count, report_manager,
                            model_saver=model_saver)
