@@ -3,7 +3,9 @@
 from __future__ import print_function
 
 import argparse
-from .models.SRU import CheckSRU
+
+from .models.sru import CheckSRU
+
 
 
 def model_opts(parser):
@@ -105,6 +107,9 @@ def model_opts(parser):
                        choices=['dot', 'general', 'mlp'],
                        help="""The attention type to use:
                        dotprod or general (Luong) or MLP (Bahdanau)""")
+    group.add_argument('-self_attn_type', type=str, default="scaled-dot",
+                       help="""Self attention type in Transformer decoder
+                       layer -- currently "scaled-dot" or "average" """)
 
     # Genenerator and loss options.
     group.add_argument('-copy_attn', action="store_true",
@@ -421,6 +426,9 @@ def translate_opts(parser):
                        help="Share source and target vocabulary")
 
     group = parser.add_argument_group('Beam')
+    group.add_argument('-fast', action="store_true",
+                       help="""Use fast beam search (some features may not be
+                       supported!)""")
     group.add_argument('-beam_size', type=int, default=5,
                        help='Beam size')
     group.add_argument('-min_length', type=int, default=0,

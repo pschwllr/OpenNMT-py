@@ -6,8 +6,7 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
-
-from torch.nn.init import xavier_uniform
+from torch.nn.init import xavier_uniform_
 
 from . import inputters
 from . import models
@@ -21,6 +20,7 @@ from .encoders.image_encoder import ImageEncoder
 from .decoders.decoder import InputFeedRNNDecoder, StdRNNDecoder
 from .decoders.transformer import TransformerDecoder
 from .decoders.cnn_decoder import CNNDecoder
+
 from .modules import Embeddings, CopyGenerator
 from .utils.misc import use_gpu
 
@@ -95,10 +95,12 @@ def build_decoder(opt, embeddings):
             print('Keep attn set to: ', opt.keep_attn)
             return TransformerDecoder(opt.dec_layers, opt.rnn_size,
                                   opt.global_attention, opt.copy_attn,
+                                  opt.self_attn_type,
                                   opt.dropout, embeddings, keep_attn=opt.keep_attn)
 
         return TransformerDecoder(opt.dec_layers, opt.rnn_size,
                                   opt.global_attention, opt.copy_attn,
+                                  opt.self_attn_type,
                                   opt.dropout, embeddings)
     elif opt.decoder_type == "cnn":
         return CNNDecoder(opt.dec_layers, opt.rnn_size,
@@ -226,10 +228,10 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
         if model_opt.param_init_glorot:
             for p in model.parameters():
                 if p.dim() > 1:
-                    xavier_uniform(p)
+                    xavier_uniform_(p)
             for p in generator.parameters():
                 if p.dim() > 1:
-                    xavier_uniform(p)
+                    xavier_uniform_(p)
 
         if hasattr(model.encoder, 'embeddings'):
             model.encoder.embeddings.load_pretrained_vectors(

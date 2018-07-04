@@ -2,7 +2,7 @@ The base code is licensed under:
 
 MIT License
 
-Copyright (c) 2017 OpenNMT
+Copyright (c) 2017-Present OpenNMT
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

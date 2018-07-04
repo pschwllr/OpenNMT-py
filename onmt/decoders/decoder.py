@@ -105,11 +105,12 @@ class RNNDecoderBase(nn.Module):
             self._copy = True
         self._reuse_copy_attn = reuse_copy_attn
 
-    def forward(self, tgt, memory_bank, state, memory_lengths=None):
+    def forward(self, tgt, memory_bank, state, memory_lengths=None,
+                step=None):
         """
         Args:
             tgt (`LongTensor`): sequences of padded tokens
-                                `[tgt_len x batch x nfeats]`.
+                 `[tgt_len x batch x nfeats]`.
             memory_bank (`FloatTensor`): vectors from the encoder
                  `[src_len x batch x hidden]`.
             state (:obj:`onmt.models.DecoderState`):
@@ -163,9 +164,8 @@ class RNNDecoderBase(nn.Module):
             # The encoder hidden is  (layers*directions) x batch x dim.
             # We need to convert it to layers x batch x (directions*dim).
             if self.bidirectional_encoder:
-                hidden = torch.cat(
-                    [hidden[0:hidden.size(0):2],
-                     hidden[1:hidden.size(0):2]], 2)
+                hidden = torch.cat([hidden[0:hidden.size(0):2],
+                                    hidden[1:hidden.size(0):2]], 2)
             return hidden
 
         if isinstance(encoder_final, tuple):  # LSTM
@@ -386,12 +386,6 @@ class DecoderState(object):
 
     Modules need to implement this to utilize beam search decoding.
     """
-    # def detach(self):
-    #    """ Need to document this VN """
-    #    for h in self._all:
-    #        if h is not None:
-    #            h.detach_()
-
     def detach(self):
         """ Need to document this """
         self.hidden = tuple([_.detach() for _ in self.hidden])
@@ -422,6 +416,9 @@ class DecoderState(object):
 
             sent_states.data.copy_(
                 sent_states.data.index_select(1, positions))
+
+    def map_batch_fn(self, fn):
+        raise NotImplementedError()
 
 
 class RNNDecoderState(DecoderState):
@@ -465,3 +462,7 @@ class RNNDecoderState(DecoderState):
                 for e in self._all]
         self.hidden = tuple(vars[:-1])
         self.input_feed = vars[-1]
+
+    def map_batch_fn(self, fn):
+        self.hidden = tuple(map(lambda x: fn(x, 1), self.hidden))
+        self.input_feed = fn(self.input_feed, 1)

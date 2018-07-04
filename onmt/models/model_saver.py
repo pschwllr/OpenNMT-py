@@ -3,7 +3,6 @@ import torch.nn as nn
 
 from .. import inputters
 
-
 def build_model_saver(model_opt, opt, model, fields, optim):
     model_saver = ModelSaver(opt.save_model,
                              model,
@@ -45,7 +44,7 @@ class ModelSaver(ModelSaverBase):
     def __init__(self, base_path, model, model_opt,
                  fields, optim, start_checkpoint_at=0):
         super(ModelSaver, self).__init__(
-            base_path, model, model_opt, fields, optim, start_checkpoint_at=0)
+            base_path, model, model_opt, fields, optim, start_checkpoint_at=start_checkpoint_at)
 
     def _save(self, epoch, valid_stats):
         real_model = (self.model.module
