@@ -5,7 +5,7 @@ import math
 import sys
 
 from torch.distributed import get_rank
-from onmt.utils.distributed import all_gather_list
+from ..utils.distributed import all_gather_list
 
 
 class Statistics(object):
