@@ -186,7 +186,7 @@ class Trainer(object):
                         true_batchs = []
                         accum = 0
                         normalization = 0
-                        if valid_steps is not None and (step % valid_steps == 0):
+                        if valid_steps != 0 and (step % valid_steps == 0):
                             if self.gpu_verbose_level > 0:
                                 logger.info('GpuRank %d: validate step %d'
                                             % (self.gpu_rank, step))
@@ -208,7 +208,7 @@ class Trainer(object):
                         if step > train_steps:
                             break
             logger.info('Completed an epoch: {}/{}'.format(step, train_steps))
-            if valid_steps is None:
+            if valid_steps == 0:
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d'
                                 % (self.gpu_rank, step))
