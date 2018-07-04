@@ -9,7 +9,7 @@ import math
 import torch
 
 from itertools import count
-from onmt.utils.misc import tile
+from ..utils.misc import tile
 
 from .. import model_builder, inputters, opts
 from .beam import GNMTGlobalScorer, Beam

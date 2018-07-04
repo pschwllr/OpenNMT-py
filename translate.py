@@ -7,11 +7,6 @@ import argparse
 from onmt.utils.misc import get_logger
 from onmt.translate.translator import build_translator
 
-import onmt.inputters
-import onmt.translate
-import onmt
-import onmt.model_builder
-import onmt.modules
 import onmt.opts
 
 
