@@ -9,6 +9,7 @@ from .distributed import all_gather_list
 from .logging import logger
 
 
+
 class Statistics(object):
     """
     Accumulator for loss statistics.
