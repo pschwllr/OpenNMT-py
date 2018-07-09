@@ -1,7 +1,10 @@
 import torch.nn as nn
 import torch
 import torch.cuda
-from ..misc import get_logger
+
+
+from ..utils.logging import init_logger
+
 
 
 class MatrixTree(nn.Module):
@@ -42,7 +45,7 @@ class MatrixTree(nn.Module):
 
 
 if __name__ == "__main__":
-    logger = get_logger('StructuredAttention.log')
+    logger = init_logger('StructuredAttention.log')
     dtree = MatrixTree()
     q = torch.rand(1, 5, 5).cuda()
     marg = dtree.forward(q)

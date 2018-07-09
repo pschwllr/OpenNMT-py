@@ -20,38 +20,34 @@ MAX_SIZE = 5000
 class TransformerDecoderLayer(nn.Module):
     """
     Args:
-      size(int): the dimension of keys/values/queries in
+      d_model (int): the dimension of keys/values/queries in
                        MultiHeadedAttention, also the input size of
                        the first-layer of the PositionwiseFeedForward.
-      droput(float): dropout probability(0-1.0).
-      head_count(int): the number of heads for MultiHeadedAttention.
-      hidden_size(int): the second-layer of the PositionwiseFeedForward.
+      heads (int): the number of heads for MultiHeadedAttention.
+      d_ff (int): the second-layer of the PositionwiseFeedForward.
+      droput (float): dropout probability(0-1.0).
+      self_attn_type (string): type of self-attention scaled-dot, average
     """
 
-    def __init__(self, size, dropout,
-
-                 head_count=8, hidden_size=2048, self_attn_type="scaled-dot", keep_attn=False):
+    def __init__(self, d_model, heads, d_ff, dropout,
+                 self_attn_type="scaled-dot", keep_attn=False):
         super(TransformerDecoderLayer, self).__init__()
 
         self.self_attn_type = self_attn_type
 
         if self_attn_type == "scaled-dot":
             self.self_attn = modules.MultiHeadedAttention(
-                head_count, size, dropout=dropout)
+                heads, d_model, dropout=dropout)
         elif self_attn_type == "average":
             self.self_attn = modules.AverageAttention(
-                size, dropout=dropout)
+                d_model, dropout=dropout)
 
         self.context_attn = modules.MultiHeadedAttention(
-                head_count, size, dropout=dropout, keep_attn=keep_attn)
+            heads, d_model, dropout=dropout, keep_attn=keep_attn)
+        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout)
+        self.layer_norm_1 = modules.LayerNorm(d_model)
+        self.layer_norm_2 = modules.LayerNorm(d_model)
 
-        self.keep_attn = keep_attn
-
-        self.feed_forward = PositionwiseFeedForward(size,
-                                                    hidden_size,
-                                                    dropout)
-        self.layer_norm_1 = modules.LayerNorm(size)
-        self.layer_norm_2 = modules.LayerNorm(size)
         self.dropout = dropout
         self.drop = nn.Dropout(dropout)
         mask = self._get_attn_subsequent_mask(MAX_SIZE)
@@ -140,16 +136,17 @@ class TransformerDecoder(nn.Module):
 
     Args:
        num_layers (int): number of encoder layers.
-       hidden_size (int): number of hidden units
+       d_model (int): size of the model
+       heads (int): number of heads
+       d_ff (int): size of the inner FF layer
        dropout (float): dropout parameters
        embeddings (:obj:`modules.Embeddings`):
           embeddings to use, should have positional encodings
        attn_type (str): if using a seperate copy attention
     """
-
-    def __init__(self, num_layers, hidden_size, attn_type,
+    def __init__(self, num_layers, d_model, heads, d_ff, attn_type,
                  copy_attn, self_attn_type, dropout, embeddings,
-                  keep_attn=False):
+                 keep_attn=False):
         super(TransformerDecoder, self).__init__()
 
         # Basic attributes.
@@ -159,8 +156,8 @@ class TransformerDecoder(nn.Module):
 
         # Build TransformerDecoder.
         self.transformer_layers = nn.ModuleList(
-            [TransformerDecoderLayer(hidden_size, dropout, 
-                self_attn_type=self_attn_type, keep_attn=keep_attn)
+            [TransformerDecoderLayer(d_model, heads, d_ff, dropout,
+             self_attn_type=self_attn_type, keep_attn=keep_attn)
              for _ in range(num_layers)])
 
         # TransformerDecoder has its own attention mechanism.
@@ -168,9 +165,10 @@ class TransformerDecoder(nn.Module):
         self._copy = False
         if copy_attn:
             self.copy_attn = modules.GlobalAttention(
-                hidden_size, attn_type=attn_type)
+                d_model, attn_type=attn_type)
             self._copy = True
-        self.layer_norm = modules.LayerNorm(hidden_size)
+        self.layer_norm = modules.LayerNorm(d_model)
+
 
     def forward(self, tgt, memory_bank, state, memory_lengths=None,
                 step=None, cache=None):

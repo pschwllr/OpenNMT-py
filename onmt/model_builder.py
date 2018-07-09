@@ -22,6 +22,8 @@ from .decoders.cnn_decoder import CNNDecoder
 
 from .modules import Embeddings, CopyGenerator
 from .utils.misc import use_gpu
+from .utils.logging import logger
+
 
 
 def build_embeddings(opt, word_dict, feature_dicts, for_encoder=True):
@@ -68,6 +70,7 @@ def build_encoder(opt, embeddings):
     """
     if opt.encoder_type == "transformer":
         return TransformerEncoder(opt.enc_layers, opt.rnn_size,
+                                  opt.heads, opt.transformer_ff,
                                   opt.dropout, embeddings)
     elif opt.encoder_type == "cnn":
         return CNNEncoder(opt.enc_layers, opt.rnn_size,
@@ -93,11 +96,13 @@ def build_decoder(opt, embeddings):
         if hasattr(opt, 'keep_attn'):
             print('Keep attn set to: ', opt.keep_attn)
             return TransformerDecoder(opt.dec_layers, opt.rnn_size,
+                                  opt.heads, opt.transformer_ff,
                                   opt.global_attention, opt.copy_attn,
                                   opt.self_attn_type,
                                   opt.dropout, embeddings, keep_attn=opt.keep_attn)
 
         return TransformerDecoder(opt.dec_layers, opt.rnn_size,
+                                  opt.heads, opt.transformer_ff,
                                   opt.global_attention, opt.copy_attn,
                                   opt.self_attn_type,
                                   opt.dropout, embeddings)
@@ -246,7 +251,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     return model
 
 
-def build_model(model_opt, opt, fields, checkpoint, logger):
+def build_model(model_opt, opt, fields, checkpoint):
     """ Build the Model """
     logger.info('Building model...')
     model = build_base_model(model_opt, fields,

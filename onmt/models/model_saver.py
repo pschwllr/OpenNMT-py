@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 
 from .. import inputters
-
+from ..utils.logging import logger
 
 from collections import deque
+
 
 
 def build_model_saver(model_opt, opt, model, fields, optim):
@@ -40,7 +41,7 @@ class ModelSaverBase(object):
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
 
-    def maybe_save(self, step):
+    def maybe_save(self, step, info_dict=None):
         """
         Main entry point for model saver
         It wraps the `_save` method with checks and apply `keep_checkpoint`
@@ -49,10 +50,10 @@ class ModelSaverBase(object):
         if self.keep_checkpoint == 0:
             return
 
-        if step % self.save_checkpoint_steps != 0:
+        if self.save_checkpoint_steps > 0 and step % self.save_checkpoint_steps != 0:
             return
 
-        chkpt, chkpt_name = self._save(step)
+        chkpt, chkpt_name = self._save(step, info_dict)
 
         if self.keep_checkpoint > 0:
             if len(self.checkpoint_queue) == self.checkpoint_queue.maxlen:
@@ -94,7 +95,7 @@ class ModelSaver(ModelSaverBase):
             save_checkpoint_steps, keep_checkpoint)
 
 
-    def _save(self, step):
+    def _save(self, step, info_dict=None):
         real_model = (self.model.module
                       if isinstance(self.model, nn.DataParallel)
                       else self.model)
@@ -114,8 +115,13 @@ class ModelSaver(ModelSaverBase):
             'optim': self.optim,
         }
 
-        print("Saving checkpoint %s_step_%d.pt" % (self.base_path, step))
-        checkpoint_path = '%s_step_%d.pt' % (self.base_path, step)
+        if info_dict is None:
+            logger.info("Saving checkpoint %s_step_%d.pt" % (self.base_path, step))
+            checkpoint_path = '%s_step_%d.pt' % (self.base_path, step)
+        else:
+            info_str = '_'.join(['{}_{}'.format(k, v) for k, v in info_dict.items()])
+            logger.info("Saving checkpoint %s_step_%d_%s.pt" % (self.base_path, step, info_str))
+            checkpoint_path = '%s_step_%d_%s.pt' % (self.base_path, step, info_str)
         torch.save(checkpoint, checkpoint_path)
         return checkpoint, checkpoint_path
 

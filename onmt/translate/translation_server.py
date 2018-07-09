@@ -10,11 +10,9 @@ import threading
 
 import torch
 
-from .translator import build_translator
-from ..utils.misc import get_logger
-
-
 from .. import opts
+from ..utils.logging import init_logger
+from .translator import build_translator
 
 
 class Timer:
@@ -177,7 +175,7 @@ class ServerModel:
         self.unload_timer = None
         self.user_opt = opt
         self.tokenizer = None
-        self.logger = get_logger(opt.log_file)
+        self.logger = init_logger(opt.log_file)
 
         if load:
             self.load()

@@ -4,14 +4,14 @@
 from __future__ import division, unicode_literals
 import argparse
 
-from onmt.utils.misc import get_logger
+from onmt.utils.logging import init_logger
 from onmt.translate.translator import build_translator
 
 import onmt.opts
 
 
 def main(opt):
-    translator = build_translator(opt, report_score=True, logger=logger)
+    translator = build_translator(opt, report_score=True)
     translator.translate(src_path=opt.src,
                          tgt_path=opt.tgt,
                          src_dir=opt.src_dir,
@@ -27,5 +27,5 @@ if __name__ == "__main__":
     onmt.opts.translate_opts(parser)
 
     opt = parser.parse_args()
-    logger = get_logger(opt.log_file)
+    logger = init_logger(opt.log_file)
     main(opt)
