@@ -434,6 +434,8 @@ def translate_opts(parser):
     group.add_argument('-report_rouge', action='store_true',
                        help="""Report rouge 1/2/3/L/SU4 score after translation
                        call tools/test_rouge.py on command line""")
+    group.add_argument('-keep_attn', action="store_true",
+                       help='Keep all decoder context attention')
 
     # Options most relevant to summarization.
     group.add_argument('-dynamic_dict', action='store_true',
