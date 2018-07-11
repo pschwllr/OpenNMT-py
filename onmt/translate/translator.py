@@ -13,6 +13,7 @@ from ..utils.misc import tile
 
 from .. import model_builder, inputters, opts
 from .beam import GNMTGlobalScorer, Beam
+from .translation import TranslationBuilder
 
 
 from pdb import set_trace  
