@@ -17,7 +17,7 @@ from onmt.model_builder import build_model
 from onmt.utils.optimizers import build_optim
 from onmt.trainer import build_trainer
 from onmt.models import build_model_saver
-from onmt.utils.logging import logger
+from onmt.utils.logging import init_logger, logger
 
 
 def _check_save_model_path(opt):
@@ -56,14 +56,19 @@ def training_opt_postprocessing(opt):
     if torch.cuda.is_available() and not opt.gpuid:
         logger.info("WARNING: You have a CUDA device, should run with -gpuid")
 
+    if opt.seed > 0:
+        torch.manual_seed(opt.seed)
+        # this one is needed for torchtext random call (shuffled iterator)
+        # in multi gpu it ensures datasets are read in the same order
+        random.seed(opt.seed)
+        # some cudnn methods can be random even after fixing the seed
+        # unless you tell it to be deterministic
+        torch.backends.cudnn.deterministic = True
+
     if opt.gpuid:
         torch.cuda.set_device(opt.device_id)
         if opt.seed > 0:
-            # this one is needed for torchtext random call (shuffled iterator)
-            # in multi gpu it ensures datasets are read in the same order
-            random.seed(opt.seed)
             # These ensure same initialization in multi gpu mode
-            torch.manual_seed(opt.seed)
             torch.cuda.manual_seed(opt.seed)
 
     return opt
@@ -71,7 +76,7 @@ def training_opt_postprocessing(opt):
 
 def main(opt):
     opt = training_opt_postprocessing(opt)
-
+    init_logger(opt.log_file)
     # Load checkpoint if we resume from a previous training.
     if opt.train_from:
         logger.info('Loading checkpoint from %s' % opt.train_from)
@@ -82,7 +87,7 @@ def main(opt):
         checkpoint = None
         model_opt = opt
 
-    # Peek the fisrt dataset to determine the data_type.
+    # Peek the first dataset to determine the data_type.
     # (All datasets have the same data_type).
     first_dataset = next(lazily_load_dataset("train", opt))
     data_type = first_dataset.data_type
@@ -121,7 +126,7 @@ def main(opt):
         lazily_load_dataset("train", opt), fields, opt)
 
     def valid_iter_fct(): return build_dataset_iter(
-        lazily_load_dataset("valid", opt), fields, opt)
+        lazily_load_dataset("valid", opt), fields, opt, is_train=False)
 
     # Do training.
     trainer.train(train_iter_fct, valid_iter_fct, opt.train_steps,

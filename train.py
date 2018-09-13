@@ -9,17 +9,17 @@ import argparse
 import onmt.opts as opts
 from onmt.train_multi import main as multi_main
 from onmt.train_single import main as single_main
-from onmt.utils.logging import init_logger
 
 
 def main(opt):
-    init_logger(opt.log_file)
-
     if opt.rnn_type == "SRU" and not opt.gpuid:
         raise AssertionError("Using SRU requires -gpuid set.")
 
     if opt.epochs:
         raise AssertionError("-epochs is deprecated please use -train_steps.")
+
+    if opt.truncated_decoder > 0 and opt.accum_count > 1:
+        raise AssertionError("BPTT is not compatible with -accum > 1")
 
     if len(opt.gpuid) > 1:
         multi_main(opt)

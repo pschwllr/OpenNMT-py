@@ -297,34 +297,8 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
         counter[k] = Counter()
 
     # Load vocabulary
-    src_vocab = None
-    # if len(src_vocab_path) > 0:
-    if src_vocab_path:
-        src_vocab = set([])
-        logger.info('Loading source vocab from %s' % src_vocab_path)
-
-        assert os.path.exists(src_vocab_path), \
-            'src vocab %s not found!' % src_vocab_path
-        with open(src_vocab_path) as f:
-            for line in f:
-                if len(line.strip()) == 0:
-                    continue
-                word = line.strip().split()[0]
-                src_vocab.add(word)
-
-    tgt_vocab = None
-    # if len(tgt_vocab_path) > 0:
-    if tgt_vocab_path:
-        tgt_vocab = set([])
-        logger.info('Loading target vocab from %s' % tgt_vocab_path)
-        assert os.path.exists(tgt_vocab_path), \
-            'tgt vocab %s not found!' % tgt_vocab_path
-        with open(tgt_vocab_path) as f:
-            for line in f:
-                if len(line.strip()) == 0:
-                    continue
-                word = line.strip().split()[0]
-                tgt_vocab.add(word)
+    src_vocab = load_vocabulary(src_vocab_path, tag="source")
+    tgt_vocab = load_vocabulary(tgt_vocab_path, tag="target")
 
     for path in train_dataset_files:
         dataset = torch.load(path)
@@ -378,6 +352,32 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
             fields["tgt"].vocab = merged_vocab
 
     return fields
+
+
+def load_vocabulary(vocabulary_path, tag=""):
+    """
+    Loads a vocabulary from the given path.
+    :param vocabulary_path: path to load vocabulary from
+    :param tag: tag for vocabulary (only used for logging)
+    :return: vocabulary or None if path is null
+    """
+    vocabulary = None
+    if vocabulary_path:
+        vocabulary = set([])
+        logger.info("Loading {} vocabulary from {}".format(tag,
+                                                           vocabulary_path))
+
+        if not os.path.exists(vocabulary_path):
+            raise RuntimeError(
+                "{} vocabulary not found at {}!".format(tag, vocabulary_path))
+        else:
+            with open(vocabulary_path) as f:
+                for line in f:
+                    if len(line.strip()) == 0:
+                        continue
+                    word = line.strip().split()[0]
+                    vocabulary.add(word)
+    return vocabulary
 
 
 class OrderedIterator(torchtext.data.Iterator):
@@ -441,23 +441,19 @@ class DatasetLazyIter(object):
         assert self.cur_iter is not None
         return len(self.cur_iter)
 
-    def get_cur_dataset(self):
-        """ Return the current dataset settings """
-        return self.cur_dataset
-
     def _next_dataset_iterator(self, dataset_iter):
         try:
-            self.cur_dataset = next(dataset_iter)
+            cur_dataset = next(dataset_iter)
         except StopIteration:
             return None
 
         # We clear `fields` when saving, restore when loading.
-        self.cur_dataset.fields = self.fields
+        cur_dataset.fields = self.fields
 
         # Sort batch by decreasing lengths of sentence required by pytorch.
         # sort=False means "Use dataset's sortkey instead of iterator's".
         return OrderedIterator(
-            dataset=self.cur_dataset, batch_size=self.batch_size,
+            dataset=cur_dataset, batch_size=self.batch_size,
             batch_size_fn=self.batch_size_fn,
             device=self.device, train=self.is_train,
             sort=False, sort_within_batch=True,
