@@ -20,9 +20,10 @@ from .translation import TranslationBuilder
 from pdb import set_trace  
 
 
-def build_translator(opt, report_score=True, logger=None, out_file=None):
+def build_translator(opt, report_score=True, logger=None, out_file=None, probs_out_file=None):
     if out_file is None and opt.output is not None:
         out_file = codecs.open(opt.output, 'w+', 'utf-8')
+        probs_out_file = codecs.open(opt.output + '_probs', 'w+', 'utf-8')
 
     if opt.gpu > -1:
         torch.cuda.set_device(opt.gpu)
@@ -48,7 +49,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
 
     translator = Translator(model, fields, global_scorer=scorer,
                             out_file=out_file, report_score=report_score,
-                            copy_attn=model_opt.copy_attn, logger=logger,
+                            copy_attn=model_opt.copy_attn, logger=logger, probs_out_file=probs_out_file,
                             **kwargs)
     return translator
 
@@ -100,6 +101,7 @@ class Translator(object):
                  report_rouge=False,
                  verbose=False,
                  out_file=None,
+                 probs_out_file=None,
                  fast=False):
         self.logger = logger
         self.gpu = gpu
@@ -126,6 +128,7 @@ class Translator(object):
         self.data_type = data_type
         self.verbose = verbose
         self.out_file = out_file
+        self.probs_out_file = probs_out_file
         self.report_score = report_score
         self.report_bleu = report_bleu
         self.report_rouge = report_rouge
@@ -232,6 +235,8 @@ class Translator(object):
                 all_predictions += [n_best_preds]
                 self.out_file.write('\n'.join(n_best_preds) + '\n')
                 self.out_file.flush()
+                self.probs_out_file.write('\n'.join([str(t.item()) for t in trans.pred_scores[:self.n_best]]) + '\n')
+                self.probs_out_file.flush()
 
                 if self.verbose:
                     sent_number = next(counter)
