@@ -818,7 +818,7 @@ class Translator(object):
     def _fast_sample_batch(self,
                               batch,
                               data,
-                              max_length,
+                              max_length=None,
                               min_length=0,
                               n_best=1,
                               return_attention=False):
@@ -835,6 +835,9 @@ class Translator(object):
         vocab = self.fields["tgt"].vocab
         start_token = vocab.stoi[inputters.BOS_WORD]
         end_token = vocab.stoi[inputters.EOS_WORD]
+
+        if max_length is None:
+            max_length = self.max_length
 
         # Encoder forward.
         src = inputters.make_features(batch, 'src', data.data_type)
@@ -1170,8 +1173,6 @@ class Translator(object):
         _, src_lengths = batch.src
 
         data_type = 'text'
-
-        set_trace()
 
         src = inputters.make_features(batch, 'src', data_type)
         tgt_in = sequences.unsqueeze(2)
