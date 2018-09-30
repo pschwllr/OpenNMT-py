@@ -81,7 +81,7 @@ class ChemVocabMasker(object):
 
     def get_valid_tokens_per_src_seq_in_batch(self, src):
         valid_tokens_per_seq = [
-            np.unique([vocab_list for voc in np.unique(s.numpy()) for vocab_list in self.vocab_vocab_dict[voc]]) for s
+            np.unique([vocab_list for voc in np.unique(s.cpu().numpy()) for vocab_list in self.vocab_vocab_dict[voc]]) for s
             in src.t()]
         return valid_tokens_per_seq
 
@@ -97,5 +97,5 @@ class ChemVocabMasker(object):
         return mask
 
     def get_unique_vocab_counts_from_source(self, src):
-        unique_counts_dicts = [dict(zip(*np.unique(s.numpy(), return_counts=True))) for s in src.t()]
+        unique_counts_dicts = [dict(zip(*np.unique(s.cpu().numpy(), return_counts=True))) for s in src.t()]
         return unique_counts_dicts
