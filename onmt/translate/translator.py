@@ -726,7 +726,7 @@ class Translator(object):
         results["batch"] = batch
 
         if self.masker is not None:
-            mask = self.masker.get_log_probs_masking_matrix(src, beam_size)
+            mask = self.masker.get_log_probs_masking_matrix(src, beam_size).to(memory_bank.device)
 
         for step in range(max_length):
             decoder_input = alive_seq[:, -1].view(1, -1, 1)
