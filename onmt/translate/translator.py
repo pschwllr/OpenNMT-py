@@ -1021,8 +1021,6 @@ class Translator(object):
 
 
 
-
-
     def _translate_batch(self, batch, data):
         # (0) Prep each of the components of the search.
         # And helper method for reducing verbosity.
@@ -1065,6 +1063,8 @@ class Translator(object):
         if data_type == 'text':
             _, src_lengths = batch.src
 
+
+
         enc_states, memory_bank = self.model.encoder(src, src_lengths)
         dec_states = self.model.decoder.init_decoder_state(
             src, memory_bank, enc_states)
@@ -1073,6 +1073,8 @@ class Translator(object):
             src_lengths = torch.Tensor(batch_size).type_as(memory_bank.data)\
                                                   .long()\
                                                   .fill_(memory_bank.size(0))
+        if self.masker is not None:
+            mask = self.masker.get_log_probs_masking_matrix(src, 1).to(memory_bank.device)
 
         # (2) Repeat src objects `beam_size` times.
         src_map = rvar(batch.src_map.data) \
@@ -1130,8 +1132,13 @@ class Translator(object):
 
             # (c) Advance each beam.
             for j, b in enumerate(beam):
-                b.advance(out[:, j],
-                          beam_attn.data[:, j, :memory_lengths[j]])
+                if self.masker is not None:
+                    set_trace()
+                    b.advance(out[:, j],
+                              beam_attn.data[:, j, :memory_lengths[j]], mask[j])
+                else:
+                    b.advance(out[:, j],
+                              beam_attn.data[:, j, :memory_lengths[j]])
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
 
         # (4) Extract sentences from beam.
