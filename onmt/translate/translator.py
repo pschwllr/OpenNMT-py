@@ -1133,7 +1133,6 @@ class Translator(object):
             # (c) Advance each beam.
             for j, b in enumerate(beam):
                 if self.masker is not None:
-                    set_trace()
                     b.advance(out[:, j],
                               beam_attn.data[:, j, :memory_lengths[j]], mask[j])
                 else:
